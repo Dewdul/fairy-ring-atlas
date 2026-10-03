@@ -41,6 +41,8 @@ public class RingDataTest
 	private static final long MAX_DECODED = 950_000;
 	private static final long MAX_RESOURCES = 6_815_744; // 6.5 MiB, DESIGN section 1
 	private static final File RESOURCE_DIR = new File("src/main/resources");
+	/** Bytes of Java and JSON text in src/main (about 312 KB today); DESIGN Deviations, "Size". */
+	private static final long MAX_SOURCE_TEXT = 300_000;
 
 	private static RingRepository real()
 	{
@@ -129,6 +131,51 @@ public class RingDataTest
 			assertNotNull(label.getT());
 			assertTrue(label.getS() >= 0 && label.getS() <= 2);
 		}
+		assertTrue(index.getIcons().size() > 1000);
+		for (MapIndex.Icon icon : index.getIcons())
+		{
+			assertTrue(icon.getSprite() > 0 && icon.getX() > 0 && icon.getY() > 0);
+		}
+	}
+
+	@Test
+	public void realSearchFindsTheBossesBesideRings()
+	{
+		RingRepository repo = real();
+		assertTrue(repo.ring("DJR").matches("yama"));
+		assertTrue(repo.ring("AIQ").matches("royal titans"));
+		assertTrue(repo.ring("ALQ").matches("araxxor"));
+		assertTrue(repo.ring("CKS").matches("grotesque"));
+	}
+
+	/**
+	 * The hub's review bot tokenizes src/main/java with comments stripped and needs it under
+	 * 200k tokens; this byte budget (comments included) warns long before that.
+	 */
+	@Test
+	public void javaSourceFitsTheReviewBudget()
+	{
+		long total = textSize(new File("src/main/java"));
+		assertTrue("src/main/java is " + total + " bytes, budget " + MAX_SOURCE_TEXT, total <= MAX_SOURCE_TEXT);
+	}
+
+	private static long textSize(File f)
+	{
+		String n = f.getName();
+		if (f.isFile())
+		{
+			return n.endsWith(".java") ? f.length() : 0;
+		}
+		long total = 0;
+		File[] kids = f.listFiles();
+		if (kids != null)
+		{
+			for (File k : kids)
+			{
+				total += textSize(k);
+			}
+		}
+		return total;
 	}
 
 	@Test
@@ -258,6 +305,9 @@ public class RingDataTest
 		assertFalse(repo.ring("DIQ").isMapped());
 		assertNull(repo.ring("AIP"));
 		assertEquals(2, repo.getIndex().getLabels().get(1).getLines().length);
+		assertEquals(1, repo.getIndex().getIcons().size());
+		assertEquals(1448, repo.getIndex().getIcons().get(0).getSprite());
+		assertEquals(2601, repo.getIndex().getIcons().get(0).getX());
 	}
 
 	@Test

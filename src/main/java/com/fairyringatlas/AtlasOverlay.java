@@ -39,6 +39,8 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 @Singleton
 public class AtlasOverlay extends Overlay
 {
+	private static final long RETRY_MS = 250;
+
 	private final Client client;
 	private final FairyRingAtlasPlugin plugin;
 	private final FairyRingAtlasConfig config;
@@ -52,6 +54,9 @@ public class AtlasOverlay extends Overlay
 	private BufferedImage cache;
 	private MapView cacheView;
 	private int cacheGeneration = -1;
+	/** Whether the cached base map had every tile at the wanted level, and when it was built. */
+	private boolean cacheComplete;
+	private long cacheBuiltAt;
 	private Area clipArea;
 	private Rectangle clipRect;
 	private List<Rectangle> clipHoles;
@@ -71,11 +76,20 @@ public class AtlasOverlay extends Overlay
 
 	void reset()
 	{
+		releaseCaches();
+		scene.hovered = null;
+		sprites.clear();
+		spritesAsked.clear();
+	}
+
+	/** Client thread: drops the map-sized buffers and text sprites; they are rebuilt on the next open. */
+	void releaseCaches()
+	{
 		cache = null;
 		cacheView = null;
 		cacheGeneration = -1;
-		sprites.clear();
-		spritesAsked.clear();
+		chrome.release();
+		painter.ink().clear();
 	}
 
 	@Override
@@ -124,11 +138,15 @@ public class AtlasOverlay extends Overlay
 			cache = new BufferedImage(v.getW(), v.getH(), BufferedImage.TYPE_INT_RGB);
 			cacheView = null;
 		}
-		if (!v.equals(cacheView) || gen != cacheGeneration)
+		// an incomplete map is rebuilt now and then even without news from the decoder, as a
+		// safety net in case a tile request was lost
+		boolean retry = !cacheComplete && scene.now - cacheBuiltAt > RETRY_MS;
+		if (!v.equals(cacheView) || gen != cacheGeneration || retry)
 		{
 			cacheGeneration = gen;
 			cacheView = v;
-			MapRenderer.render(cache, v, plugin.getTiles(), layer == null ? Color.BLACK : layer.getBackgroundColor());
+			cacheBuiltAt = scene.now;
+			cacheComplete = MapRenderer.render(cache, v, plugin.getTiles(), layer == null ? Color.BLACK : layer.getBackgroundColor());
 		}
 
 		chrome.paintShadow(g, scene);
@@ -171,8 +189,12 @@ public class AtlasOverlay extends Overlay
 		s.favouriteColor = config.favouriteColor();
 		net.runelite.api.Point mp = client.getMouseCanvasPosition();
 		s.mouse = new java.awt.Point(mp.getX(), mp.getY());
-		Hit hover = plugin.isMapInput(mp.getX(), mp.getY()) ? plugin.hitAt(mp.getX(), mp.getY()) : null;
-		s.hovered = hover != null && (hover.getKind() == Hit.Kind.MARKER || hover.getKind() == Hit.Kind.CHIP) ? hover.getRing() : null;
+		// while a right-click menu is open the card keeps describing the ring it was opened on
+		if (!client.isMenuOpen())
+		{
+			Hit hover = plugin.isMapInput(mp.getX(), mp.getY()) ? plugin.hitAt(mp.getX(), mp.getY()) : null;
+			s.hovered = hover != null && (hover.getKind() == Hit.Kind.MARKER || hover.getKind() == Hit.Kind.CHIP) ? hover.getRing() : null;
+		}
 		if (!plugin.isMapInput(mp.getX(), mp.getY()))
 		{
 			s.mouse = null;

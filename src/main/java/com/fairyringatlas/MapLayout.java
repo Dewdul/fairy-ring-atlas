@@ -88,45 +88,52 @@ public final class MapLayout
 
 	/**
 	 * Resizable-mode layout. Each obstacle overlapping the usable area cuts it from the side
-	 * (bottom, right or left) that keeps the most room while leaving the dials inside.
+	 * (bottom, right, left or top) that clears it and keeps the most room. A cut never goes past
+	 * the dials' own edge, so on a small canvas, where the dials sit within a few pixels of the
+	 * edge, the map still stops at the dials instead of covering the chatbox, side panel and log.
 	 */
 	public static Rectangle compute(Rectangle canvas, Rectangle dial, List<Rectangle> obstacles, int maxW, int maxH)
 	{
-		int left = canvas.x + 6;
-		int top = canvas.y + 6;
-		int right = canvas.x + canvas.width - 6;
-		int bottom = canvas.y + canvas.height - 6;
+		int dialRight = dial.x + dial.width;
+		int dialBottom = dial.y + dial.height;
+		// the inset canvas, grown to hold the dials when they sit closer than the inset to an edge
+		int left = Math.min(canvas.x + 6, dial.x);
+		int top = Math.min(canvas.y + 6, dial.y);
+		int right = Math.max(canvas.x + canvas.width - 6, dialRight);
+		int bottom = Math.max(canvas.y + canvas.height - 6, dialBottom);
 		for (Rectangle o : obstacles)
 		{
 			if (o.x >= right || o.x + o.width <= left || o.y >= bottom || o.y + o.height <= top || o.intersects(dial))
 			{
 				continue;
 			}
-			long best = -1;
-			int[] cut = null;
 			int[][] options = {
-				{left, top, right, o.y - 6},
-				{left, top, o.x - 8, bottom},
-				{o.x + o.width + 8, top, right, bottom},
-				{left, o.y + o.height + 6, right, bottom},
+				{left, top, right, Math.max(o.y - 6, dialBottom)},
+				{left, top, Math.max(o.x - 8, dialRight), bottom},
+				{Math.min(o.x + o.width + 8, dial.x), top, right, bottom},
+				{left, Math.min(o.y + o.height + 6, dial.y), right, bottom},
 			};
+			// least overlap with the obstacle first (none, when a cut clears it), then most room
+			int[] cut = null;
+			long bestOverlap = Long.MAX_VALUE;
+			long bestArea = -1;
 			for (int[] c : options)
 			{
-				boolean keepsDial = c[0] <= dial.x && c[1] <= dial.y && c[2] >= dial.x + dial.width && c[3] >= dial.y + dial.height;
-				long area = (long) Math.max(0, c[2] - c[0]) * Math.max(0, c[3] - c[1]);
-				if (keepsDial && area > best)
+				Rectangle r = new Rectangle(c[0], c[1], Math.max(0, c[2] - c[0]), Math.max(0, c[3] - c[1]));
+				Rectangle in = r.intersection(o);
+				long overlap = in.isEmpty() ? 0 : (long) in.width * in.height;
+				long area = (long) r.width * r.height;
+				if (overlap < bestOverlap || (overlap == bestOverlap && area > bestArea))
 				{
-					best = area;
+					bestOverlap = overlap;
+					bestArea = area;
 					cut = c;
 				}
 			}
-			if (cut != null)
-			{
-				left = cut[0];
-				top = cut[1];
-				right = cut[2];
-				bottom = cut[3];
-			}
+			left = cut[0];
+			top = cut[1];
+			right = cut[2];
+			bottom = cut[3];
 		}
 
 		int w = Math.max(dial.width, Math.min(maxW, right - left));

@@ -32,6 +32,7 @@ public class Ring
 	private int plane;
 	@Setter
 	private String layer;
+	@Setter
 	private String area;
 	private List<String> requirements;
 	private List<String> danger;

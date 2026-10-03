@@ -12,5 +12,5 @@
     { "t": "Big Town", "x": 2600, "y": 3240, "s": 2, "layer": "surface" },
     { "t": "Small<br>Place", "x": 2610, "y": 3210, "s": 0, "layer": "surface" }
   ],
-  "icons": [ { "x": 2601, "y": 3231, "sprite": 1448 } ]
+  "icons": [ [2601, 3231, 1448] ]
 }

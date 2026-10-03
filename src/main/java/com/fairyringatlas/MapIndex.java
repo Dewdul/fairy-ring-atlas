@@ -22,7 +22,11 @@ public class MapIndex
 	private Map<String, Map<String, String>> solid;
 	private List<Layer> layers;
 	private List<Label> labels;
-	private List<Icon> icons;
+	/** Map icons as compact [x, y, sprite] triples (the bulk of the index). */
+	@Getter(lombok.AccessLevel.NONE)
+	private List<int[]> icons;
+	@Getter(lombok.AccessLevel.NONE)
+	private transient List<Icon> iconList;
 
 	/** A world-map place name. s is the size class: 0 small, 1 medium, 2 large. */
 	@Getter
@@ -62,9 +66,16 @@ public class MapIndex
 	@Getter
 	public static class Icon
 	{
-		private int x;
-		private int y;
-		private int sprite;
+		private final int x;
+		private final int y;
+		private final int sprite;
+
+		Icon(int x, int y, int sprite)
+		{
+			this.x = x;
+			this.y = y;
+			this.sprite = sprite;
+		}
 	}
 
 	public List<Integer> getLevels()
@@ -79,7 +90,19 @@ public class MapIndex
 
 	public List<Icon> getIcons()
 	{
-		return icons == null ? Collections.emptyList() : icons;
+		if (iconList == null)
+		{
+			List<Icon> out = new ArrayList<>();
+			for (int[] i : icons == null ? Collections.<int[]>emptyList() : icons)
+			{
+				if (i != null && i.length >= 3)
+				{
+					out.add(new Icon(i[0], i[1], i[2]));
+				}
+			}
+			iconList = out;
+		}
+		return iconList;
 	}
 
 	public List<Layer> getLayers()

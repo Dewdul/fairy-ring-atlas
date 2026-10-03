@@ -89,6 +89,28 @@ public class TileStoreTest
 	}
 
 	@Test
+	public void requestsTheViewMovedPastAreDropped()
+	{
+		List<Runnable> queue = new ArrayList<>();
+		TileStore t = new TileStore(repo.getIndex(), repo.getLayers(), FIXTURES, queue::add);
+		assertNull(t.request(2, 40, 50));
+		t.beginFrame();
+		t.beginFrame();
+		// not asked for by the last rebuild: dropped, and a later request queues it again
+		queue.remove(0).run();
+		assertNull(t.get(2, 40, 50));
+		assertNull(t.request(2, 40, 50));
+		assertEquals(1, queue.size());
+		// asked again before the worker got to it: it is still wanted, so it loads
+		t.beginFrame();
+		t.beginFrame();
+		assertNull(t.request(2, 40, 50));
+		assertEquals(1, queue.size());
+		queue.remove(0).run();
+		assertNotNull(t.get(2, 40, 50));
+	}
+
+	@Test
 	public void rendererFillsTheView()
 	{
 		TileStore t = new TileStore(repo.getIndex(), repo.getLayers(), FIXTURES, Runnable::run);
@@ -98,5 +120,20 @@ public class TileStoreTest
 		// the view is exactly the fixture tile at 1:1
 		assertEquals(0xC80000, out.getRGB(10, 128) & 0xFFFFFF);
 		assertEquals(0x0000C8, out.getRGB(250, 128) & 0xFFFFFF);
+	}
+
+	@Test
+	public void zoomingOutDrawsCachedFinerTilesWhileTheLevelLoads()
+	{
+		List<Runnable> queue = new ArrayList<>();
+		TileStore t = new TileStore(repo.getIndex(), repo.getLayers(), FIXTURES, queue::add);
+		t.request(2, 40, 50);
+		queue.remove(0).run();
+		// at 2 ppt the wanted level is z=1, still queued; its z=2 child is cached
+		MapView v = MapView.of(repo.surface(), new Rectangle(0, 0, 256, 256)).centerOn(2592, 3232, 2);
+		BufferedImage out = new BufferedImage(256, 256, BufferedImage.TYPE_INT_RGB);
+		assertTrue(!MapRenderer.render(out, v, t, Color.BLACK));
+		assertEquals(0xC80000, out.getRGB(80, 128) & 0xFFFFFF);
+		assertEquals(0x0000C8, out.getRGB(170, 128) & 0xFFFFFF);
 	}
 }

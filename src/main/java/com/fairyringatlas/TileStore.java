@@ -25,6 +25,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.imageio.ImageIO;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -40,9 +41,18 @@ public class TileStore
 	/** Marks a tile outside every layer: the renderer fills it with the current layer's background. */
 	public static final BufferedImage NONE = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
 	public static final int MIN_LEVEL = -3;
+	/**
+	 * Soft cap of the LRU. Tiles drawn by the last two viewport rebuilds are never evicted, so a
+	 * view needing more than this (a 2000x1400 map just above a level boundary) cannot evict its
+	 * own tiles and decode them again for ever; it holds what it shows until the view moves.
+	 */
 	private static final long MAX_BYTES = 48L << 20;
-	/** Requests older than this many frames are dropped from the queue (the view moved on). */
-	private static final int STALE_FRAMES = 40;
+	/**
+	 * Requests not repeated by the latest viewport rebuild are dropped from the queue: every
+	 * rebuild asks again for each tile it still shows, so an older request is for a view the
+	 * player has left.
+	 */
+	private static final int STALE_FRAMES = 1;
 
 	private final String base;
 	private final Executor executor;
@@ -52,6 +62,8 @@ public class TileStore
 	private final int maxLevel;
 	private final int minBundled;
 	private final LinkedHashMap<Long, BufferedImage> lru = new LinkedHashMap<>(256, 0.75f, true);
+	/** The rebuild (frame) that last drew each cached tile; guarded by lru. */
+	private final Map<Long, Long> used = new HashMap<>();
 	private long bytes;
 	private final Map<Long, Long> pending = new ConcurrentHashMap<>();
 	private final AtomicInteger generation = new AtomicInteger();
@@ -140,15 +152,23 @@ public class TileStore
 		}
 	}
 
-	/** A cached tile, or null after queueing it for decoding. */
+	/** A cached tile (marked as drawn by this rebuild), or null after queueing it for decoding. */
 	public BufferedImage request(int z, int tx, int ty)
 	{
-		BufferedImage img = get(z, tx, ty);
+		long k = key(z, tx, ty);
+		BufferedImage img;
+		synchronized (lru)
+		{
+			img = lru.get(k);
+			if (img != null)
+			{
+				used.put(k, frame.get());
+			}
+		}
 		if (img != null || closed)
 		{
 			return img;
 		}
-		long k = key(z, tx, ty);
 		if (pending.put(k, frame.get()) == null)
 		{
 			try
@@ -166,19 +186,39 @@ public class TileStore
 	public void close()
 	{
 		closed = true;
+		trim();
+	}
+
+	/** Drops every decoded tile (the interface has been closed a while); the store stays usable. */
+	public void trim()
+	{
 		synchronized (lru)
 		{
 			lru.clear();
+			used.clear();
 			bytes = 0;
 		}
 	}
 
 	private void run(long k, int z, int tx, int ty)
 	{
+		// a stale request is dropped, unless the client thread asked for it again meanwhile
+		Long asked = pending.get(k);
+		while (asked != null && frame.get() - asked > STALE_FRAMES)
+		{
+			if (pending.remove(k, asked))
+			{
+				return;
+			}
+			asked = pending.get(k);
+		}
+		if (asked == null)
+		{
+			return;
+		}
 		try
 		{
-			Long asked = pending.get(k);
-			if (closed || asked == null || frame.get() - asked > STALE_FRAMES)
+			if (closed)
 			{
 				return;
 			}
@@ -299,7 +339,12 @@ public class TileStore
 			{
 				return null;
 			}
-			BufferedImage raw = ImageIO.read(in);
+			// decode in memory: ImageIO's default stream cache writes a temp file per image
+			BufferedImage raw;
+			synchronized (ImageIO.class)
+			{
+				raw = ImageIO.read(new MemoryCacheImageInputStream(in));
+			}
 			if (raw == null)
 			{
 				return null;
@@ -353,10 +398,20 @@ public class TileStore
 			}
 			BufferedImage old = lru.put(k, img);
 			bytes += weight(img) - (old == null ? 0 : weight(old));
-			Iterator<BufferedImage> it = lru.values().iterator();
+			used.putIfAbsent(k, frame.get());
+			// evict least recently used first, but never what the last two rebuilds drew
+			long keepFrom = frame.get() - 1;
+			Iterator<Map.Entry<Long, BufferedImage>> it = lru.entrySet().iterator();
 			while (bytes > MAX_BYTES && it.hasNext())
 			{
-				bytes -= weight(it.next());
+				Map.Entry<Long, BufferedImage> e = it.next();
+				Long u = used.get(e.getKey());
+				if (u != null && u >= keepFrom)
+				{
+					continue;
+				}
+				bytes -= weight(e.getValue());
+				used.remove(e.getKey());
 				it.remove();
 			}
 		}

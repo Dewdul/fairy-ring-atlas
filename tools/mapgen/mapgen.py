@@ -466,6 +466,11 @@ def tighten_surface(surface, z2, sea, rings):
     return drop
 
 
+# Labels the cache puts where a player cannot go from the ring. The Fight Cave name sits in the
+# arena instance (region 9551); the entrance players walk to is north of BLP.
+LABEL_MOVES = {("Fight Cave", "mor_ul_rek"): (2439, 5172)}
+
+
 def export_labels_icons(layers):
     def layer_of(x, y):
         for l in layers:
@@ -492,6 +497,9 @@ def export_labels_icons(layers):
             continue
         seen.add(key)
         o = {"t": t, "x": l["x"], "y": l["y"], "s": max(0, min(2, l["s"])), "layer": lid}
+        moved = LABEL_MOVES.get((t, lid))
+        if moved:
+            o["x"], o["y"] = moved
         if l["c"] != "#ffffff":
             o["c"] = l["c"]  # optional text colour (orange/cyan in-game labels); absent = white
         labels.append(o)
@@ -515,8 +523,9 @@ def export_labels_icons(layers):
         if key in seen:
             continue
         seen.add(key)
-        icons.append({"x": i["x"], "y": i["y"], "sprite": i["sprite"]})
-    icons.sort(key=lambda o: (o["y"], o["x"]))
+        icons.append([i["x"], i["y"], i["sprite"]])
+    # compact [x, y, sprite] triples: they are most of index.json, which ships as source text
+    icons.sort(key=lambda o: (o[1], o[0]))
     print("Icons: dropped %d fairy-ring transport icons under ring markers" % dropped)
     return labels, icons
 

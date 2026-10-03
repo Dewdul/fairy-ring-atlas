@@ -55,7 +55,8 @@ public class ChromePainter
 	public void layout(Scene s)
 	{
 		MapView v = s.view;
-		s.topBar = new Rectangle(v.getX(), v.getY(), v.getW(), BAR_H);
+		// the bar and, when shown, the notice strip under it
+		s.topBar = new Rectangle(v.getX(), v.getY(), v.getW(), BAR_H + (s.notice != null ? 18 : 0));
 		// the card painted last; the map painter keeps labels from hiding half under it
 		s.card = layerCard != null && v.rect().contains(layerCard) ? layerCard : null;
 		int top = v.getY() + BAR_H + (s.notice != null ? 18 : 0) + 6;
@@ -130,7 +131,7 @@ public class ChromePainter
 		boolean flash = s.now < s.flashUntil && (s.now / 250) % 2 == 0;
 		return java.util.Objects.hash(v.getX(), v.getY(), v.getW(), v.getH(), v.getLayer(), s.selected, s.hovered,
 			java.util.Arrays.hashCode(s.dials), s.query, s.rowVisible, s.notice, s.panelCollapsed, s.panelScroll,
-			s.now < s.flashUntil, flash, System.identityHashCode(hover), s.holes, s.repo.getStateHash(), s.here,
+			s.now < s.flashUntil, flash, hover, s.holes, s.repo.getStateHash(), s.here,
 			s.visitedColor, s.selectedColor, s.favouriteColor, focusCovered(s));
 	}
 
@@ -139,11 +140,20 @@ public class ChromePainter
 	private final List<Hit> layerHits = new ArrayList<>();
 	private Rectangle layerCard;
 
+	/** Drops the map-sized layer while the interface is closed; it is rebuilt on the next paint. */
+	public void release()
+	{
+		layer = null;
+		layerHits.clear();
+		layerCard = null;
+		layerKey = 0;
+	}
+
 	// ------------------------------------------------------------------ top bar
 
 	private void paintTopBar(Graphics2D g, Scene s)
 	{
-		Rectangle bar = s.topBar;
+		Rectangle bar = new Rectangle(s.topBar.x, s.topBar.y, s.topBar.width, BAR_H);
 		g.setColor(new Color(16, 13, 9, 215));
 		g.fillRect(bar.x, bar.y, bar.width, bar.height);
 		g.setColor(BRONZE);
@@ -304,10 +314,26 @@ public class ChromePainter
 		if (s.panelCollapsed)
 		{
 			s.hits.add(new Hit(Hit.Kind.BUTTON, p, null, Hit.TOGGLE_PANEL, "Show", "Elsewhere"));
+			// the search matches a ring elsewhere: the tab says so (and flashes with the cards)
+			boolean matches = false;
+			for (Card c : cards(s))
+			{
+				for (Ring r : c.rings)
+				{
+					matches |= s.searching() && r.matches(s.query);
+				}
+			}
+			boolean flash = s.now < s.flashUntil && (s.now / 250) % 2 == 0;
+			if (matches)
+			{
+				g.setColor(flash ? Color.WHITE : HINT);
+				g.setStroke(new BasicStroke(1.5f));
+				g.drawRoundRect(p.x, p.y, p.width - 1, p.height - 1, 8, 8);
+			}
 			triangle(g, p.x + p.width / 2.0, p.y + 12, 4, true, CREAM);
 			for (int i = 0; i < 3; i++)
 			{
-				g.setColor(i == 0 ? s.visitedColor : BRONZE_LIGHT);
+				g.setColor(matches ? HINT : i == 0 ? s.visitedColor : BRONZE_LIGHT);
 				g.fill(AtlasPainter.circle(p.x + p.width / 2.0, p.y + 26 + i * 10, 2.5));
 			}
 			return;
@@ -468,12 +494,15 @@ public class ChromePainter
 		java.awt.Point focus = cardFocus(s);
 		if (ring == null)
 		{
-			s.card = null;
 			String hint = "Click a fairy ring to plan your trip";
 			int w = ink.width(ink.small, hint) + 12;
-			Rectangle r = place(s, left, w, ink.height(ink.small) + 8, w, null);
+			int hh = ink.height(ink.small) + 8;
+			Rectangle r = place(s, left, w, hh, hh, null);
+			// like the card, the hint keeps labels from under it and absorbs presses
+			s.card = r;
 			if (r != null)
 			{
+				s.hits.add(new Hit(Hit.Kind.BLOCK, r, null, null, null, null));
 				panelBox(g, r);
 				ink.text(g, hint, ink.small, GREY, r.x + 6, r.y + 4, Ink.Style.SHADOW);
 			}
@@ -520,7 +549,8 @@ public class ChromePainter
 		}
 		if (ring.isNoStaffReturn() && !s.repo.isStaffless())
 		{
-			addWrapped(lines, "Bring your staff: the only way back is a fairy ring.", ink.small, AMBER, textW, 4);
+			// the game's no_staff_return flag: this ring works without a staff, but only to Zanaris
+			addWrapped(lines, "No staff needed to leave: this ring can take you back to Zanaris.", ink.small, GREY, textW, 4);
 		}
 		first = true;
 		for (String d : ring.getDanger())

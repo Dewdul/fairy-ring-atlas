@@ -172,4 +172,32 @@ public class MapViewTest
 		Rectangle r = MapLayout.compute(canvas, dial, Collections.singletonList(new Rectangle(0, 360, 600, 20)), 1100, 720);
 		assertTrue(r.contains(dial));
 	}
+
+	/**
+	 * Small resizable canvases (and stretched mode, which clamps one side to 765 or 503), where the
+	 * dials sit within the 6 px inset of the edge. Geometry of toplevel 161: the dial is centred
+	 * above the 165 px chatbox and left of the 250 px side area.
+	 */
+	@Test
+	public void smallResizableCanvasKeepsClearOfChatSideAndLog()
+	{
+		int[][] sizes = {{765, 503}, {800, 503}, {862, 503}, {773, 600}, {765, 600}, {900, 510}, {1600, 900}};
+		for (int[] s : sizes)
+		{
+			int w = s[0];
+			int h = s[1];
+			Rectangle canvas = new Rectangle(0, 0, w, h);
+			Rectangle dial = new Rectangle((w - 250 - 512) / 2, (h - 165 - 334) / 2, 512, 334);
+			Rectangle chat = new Rectangle(0, h - 165, 519, 165);
+			Rectangle side = new Rectangle(w - 241, h - 335, 241, 335);
+			Rectangle log = new Rectangle(w - 216, h - 298, 190, 261);
+			Rectangle r = MapLayout.compute(canvas, dial, Arrays.asList(chat, side, log), 1100, 720);
+			String at = w + "x" + h + " gave " + r;
+			assertTrue(at, r.contains(dial));
+			assertTrue(at, !r.intersects(chat));
+			assertTrue(at, !r.intersects(side));
+			assertTrue(at, !r.intersects(log));
+			assertTrue(at, canvas.contains(r));
+		}
+	}
 }

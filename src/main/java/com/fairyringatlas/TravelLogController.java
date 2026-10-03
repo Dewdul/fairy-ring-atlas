@@ -22,7 +22,8 @@ import net.runelite.client.util.Text;
  * it can be put back exactly. The player still clicks the real row.
  * <p>
  * The game re-lays-out the log (proc 8080) on open, sort and search; its rebuild overwrites our
- * edits, so the records are then dropped (not restored) and the filter is applied again.
+ * edits, so the records are then dropped (only the text colours, which it never resets, are put
+ * back) and the filter is applied again.
  */
 @Slf4j
 public class TravelLogController
@@ -99,10 +100,13 @@ public class TravelLogController
 	}
 
 	/**
-	 * Filter the log to one ring. Returns false (and changes nothing) when its row is not there.
+	 * Filter the log to one ring. Any earlier filter is put back first, so the target is looked up
+	 * in the log as the game drew it (a previous filter hid every other row). Returns false, with
+	 * the log left restored, when its row is not there.
 	 */
 	public boolean apply(Ring ring, int faveSlot, Map<String, int[]> logComponents, int colour)
 	{
+		restore();
 		Widget contents = client.getWidget(InterfaceID.FairyringsLog.CONTENTS);
 		Widget target = row(ring, faveSlot);
 		if (contents == null || target == null)
@@ -114,7 +118,6 @@ public class TravelLogController
 		Widget star = faveSlot >= 0 ? client.getWidget(FAVE_ICONS[faveSlot])
 			: ring.getStarComponent() > 0 ? client.getWidget(ring.getStarComponent()) : null;
 
-		restore();
 		for (int i = 0; i < FAVE_ROWS.length; i++)
 		{
 			if (i != faveSlot)
@@ -216,9 +219,18 @@ public class TravelLogController
 		filtered = null;
 	}
 
-	/** The game rebuilt the log (or closed it): our records describe widgets that changed. */
+	/**
+	 * The game rebuilt the log (or closed it): our records describe widgets that changed, so they
+	 * are dropped. The rebuild resets positions, sizes, scroll and hidden flags but never the row
+	 * text colours, so only those are put back; otherwise the next filter would record our
+	 * selection colour as the original.
+	 */
 	public void forget()
 	{
+		for (RowState s : edits.values())
+		{
+			s.w.setTextColor(s.textColor);
+		}
 		edits.clear();
 		filtered = null;
 	}

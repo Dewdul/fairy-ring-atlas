@@ -26,6 +26,7 @@ import net.runelite.api.Client;
 import net.runelite.api.gameval.DBTableID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.util.Text;
 
 /**
  * The ring data: rings.json and map/index.json from the jar, patched with the game's own fairy
@@ -245,7 +246,15 @@ public class RingRepository
 					int x = (coord >> 14) & 0x3FFF;
 					int y = coord & 0x3FFF;
 					Layer l = layerAt(x, y);
-					ring = new Ring(code, desc, x, y, l == null ? null : l.getId());
+					// the cache text reads "<br>Region: Place "
+					String text = Text.removeTags(desc).trim();
+					int colon = text.indexOf(':');
+					String name = colon > 0 ? text.substring(colon + 1).trim() : text;
+					ring = new Ring(code, name.isEmpty() ? text : name, x, y, l == null ? null : l.getId());
+					if (colon > 0)
+					{
+						ring.setArea(text.substring(0, colon).trim());
+					}
 					rings.add(ring);
 					byCode.put(code, ring);
 				}
@@ -327,7 +336,7 @@ public class RingRepository
 			Widget label = client.getWidget(TravelLogController.FAVE_CODES[i]);
 			if (row != null && label != null && row.getText() != null && !row.getText().isEmpty())
 			{
-				String code = DialMath.normalize(net.runelite.client.util.Text.removeTags(label.getText()));
+				String code = DialMath.normalize(Text.removeTags(label.getText()));
 				if (code != null)
 				{
 					favourites.put(code, i);

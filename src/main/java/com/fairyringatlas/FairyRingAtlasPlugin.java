@@ -10,6 +10,7 @@ import com.google.inject.Provides;
 import java.awt.Insets;
 import java.awt.Rectangle;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -18,7 +19,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import lombok.Getter;
@@ -38,6 +41,7 @@ import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.VarClientStrChanged;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.gameval.InterfaceID;
@@ -64,7 +68,8 @@ import net.runelite.client.util.Text;
 @PluginDescriptor(
 	name = "Fairy Ring Atlas",
 	description = "Turns the fairy ring dials into a high-resolution, zoomable map of every destination: click a ring, then use its travel log entry or follow the dial guide",
-	tags = {"fairy", "ring", "map", "teleport", "travel", "zanaris", "code", "dial", "transport"}
+	tags = {"fairy", "ring", "map", "teleport", "travel", "zanaris", "code", "dial", "transport"},
+	conflicts = "Fairy Ring Map"
 )
 @PluginDependency(ClueScrollPlugin.class)
 public class FairyRingAtlasPlugin extends Plugin
@@ -74,7 +79,11 @@ public class FairyRingAtlasPlugin extends Plugin
 	private static final int SCRIPT_CONFIRM = 399;
 	private static final int SCRIPT_CONFIRM_EXPIRE = 400;
 	private static final int REOPEN_TICKS = 3;
+	/** About 30 s after the interface closes, its caches are released. */
+	private static final int TRIM_TICKS = 50;
 	private static final long ANIM_MS = 250;
+	/** The game's fairy ring search keeps at most this many characters. */
+	private static final int SEARCH_MAX = 30;
 	private static final String FRM_CLASS = "com.fairyringmap.FairyRingMapPlugin";
 
 	/** Components of 398 hidden in map mode; CONFIRM, the close button, the backdrop and its ornament stay. */
@@ -150,6 +159,8 @@ public class FairyRingAtlasPlugin extends Plugin
 	@Getter
 	private volatile int panelScroll;
 	private volatile int panelScrollMax;
+	/** What the game's current menu was built for (see {@link #menuKey(Hit)}); null when not ours. */
+	private volatile String menuFor;
 
 	// --- client thread state
 	@Getter
@@ -175,6 +186,10 @@ public class FairyRingAtlasPlugin extends Plugin
 	private MapView sessionView;
 	private final Map<String, MapView> layerViews = new HashMap<>();
 	private final Set<Integer> hiddenByUs = new HashSet<>();
+	/** The code the player picked in the travel log itself; the log is not filtered for it. */
+	private String logPicked;
+	/** Whether the decoded tiles and map-sized caches were released since the interface closed. */
+	private boolean trimmed = true;
 
 	@Provides
 	FairyRingAtlasConfig provideConfig(ConfigManager configManager)
@@ -186,7 +201,16 @@ public class FairyRingAtlasPlugin extends Plugin
 	protected void startUp()
 	{
 		repo = RingRepository.load(gson, RESOURCES);
-		executor = Executors.newSingleThreadExecutor(r ->
+		// one worker, newest request first: the tiles of the current view are decoded before the
+		// leftovers of views the player has already zoomed or panned past
+		executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingDeque<Runnable>()
+		{
+			@Override
+			public boolean offer(Runnable r)
+			{
+				return offerFirst(r);
+			}
+		}, r ->
 		{
 			Thread t = new Thread(r, "fairy-ring-atlas-tiles");
 			t.setDaemon(true);
@@ -215,19 +239,23 @@ public class FairyRingAtlasPlugin extends Plugin
 		mouseManager.unregisterMouseListener(input);
 		mouseManager.unregisterMouseWheelListener(input);
 		input.reset();
+		open = false;
+		// the rest is client-thread state (the overlay may be mid-frame on it right now); the
+		// overlay is already removed, so nothing renders after this runs
 		TravelLogController logController = travelLog;
+		ExecutorService ex = executor;
+		TileStore store = tiles;
 		clientThread.invoke(() ->
 		{
 			restoreHides();
 			logController.restore();
+			overlay.reset();
+			view = null;
+			selected = null;
+			hits = Collections.emptyList();
+			ex.shutdownNow();
+			store.close();
 		});
-		open = false;
-		executor.shutdownNow();
-		tiles.close();
-		overlay.reset();
-		view = null;
-		selected = null;
-		hits = Collections.emptyList();
 	}
 
 	// ------------------------------------------------------------------ open / close
@@ -263,12 +291,14 @@ public class FairyRingAtlasPlugin extends Plugin
 	private void onDialsOpened()
 	{
 		int tick = client.getTickCount();
-		boolean reopen = tick - closedTick <= REOPEN_TICKS;
+		boolean reopen = tick >= closedTick && tick - closedTick <= REOPEN_TICKS;
 		open = true;
+		trimmed = false;
 		mode = reopen ? closedMode : config.openInMapMode() ? Mode.MAP : Mode.DIAL;
 		if (!reopen)
 		{
 			selected = null;
+			logPicked = null;
 			panelScroll = 0;
 			needsInitialView = true;
 		}
@@ -311,6 +341,14 @@ public class FairyRingAtlasPlugin extends Plugin
 		restoreHides();
 		travelLog.restore();
 		hits = Collections.emptyList();
+	}
+
+	/** Client thread: releases the decoded tiles and the map-sized buffers while the dials are closed. */
+	private void trimCaches()
+	{
+		trimmed = true;
+		tiles.trim();
+		overlay.releaseCaches();
 	}
 
 	private void locatePlayer()
@@ -358,12 +396,30 @@ public class FairyRingAtlasPlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged e)
 	{
-		if (e.getGameState() != GameState.LOGGED_IN && open)
+		GameState state = e.getGameState();
+		// a map reload or a brief reconnect keeps the interfaces (and our hides) alive; a real
+		// close is still caught by WidgetClosed or the per-tick visibility check
+		if (state == GameState.LOGGED_IN || state == GameState.LOADING || state == GameState.CONNECTION_LOST)
 		{
+			return;
+		}
+		if (open)
+		{
+			// the interface tree is gone: drop our records rather than touch orphaned widgets
 			open = false;
+			closedTick = client.getTickCount();
+			closedMode = mode;
+			if (view != null)
+			{
+				sessionView = view;
+			}
 			hiddenByUs.clear();
 			travelLog.forget();
 			hits = Collections.emptyList();
+		}
+		if (state == GameState.LOGIN_SCREEN)
+		{
+			trimCaches();
 		}
 	}
 
@@ -387,6 +443,13 @@ public class FairyRingAtlasPlugin extends Plugin
 		}
 		if (!open)
 		{
+			// free the decoded tiles and map-sized buffers once the ring has been left alone for a
+			// while; a quick reopen (a favourite toggle, the next trip) stays warm
+			int tick = client.getTickCount();
+			if (!trimmed && (tick - closedTick >= TRIM_TICKS || tick < closedTick))
+			{
+				trimCaches();
+			}
 			return;
 		}
 		repo.refreshState(client);
@@ -479,10 +542,16 @@ public class FairyRingAtlasPlugin extends Plugin
 		}
 	}
 
+	/** The search as the game's log filter sees it: lower case, at most 30 characters, not trimmed. */
 	private String currentSearch()
 	{
 		String s = client.getVarcStrValue(VarClientID.FAIRYRINGS_SEARCHSTRING);
-		return s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
+		if (s == null)
+		{
+			return "";
+		}
+		s = s.toLowerCase(Locale.ROOT);
+		return s.length() > SEARCH_MAX ? s.substring(0, SEARCH_MAX) : s;
 	}
 
 	@Subscribe
@@ -497,13 +566,21 @@ public class FairyRingAtlasPlugin extends Plugin
 		Ring r = repo.ring(code);
 		if (r != null)
 		{
-			boolean changed = !code.equals(selected);
+			// the player is using the log directly: follow on the map, but leave the log as it is
 			selected = code;
+			logPicked = code;
 			panTo(r);
-			if (changed)
-			{
-				applyLogFilter();
-			}
+		}
+	}
+
+	@Subscribe
+	public void onVarbitChanged(VarbitChanged e)
+	{
+		int id = e.getVarbitId();
+		if (open && (id == VarbitID.FAIRYRING_1 || id == VarbitID.FAIRYRING_2 || id == VarbitID.FAIRYRING_3))
+		{
+			// once the dials show the selection the filter has done its job
+			applyLogFilter();
 		}
 	}
 
@@ -576,6 +653,7 @@ public class FairyRingAtlasPlugin extends Plugin
 			return;
 		}
 		selected = code;
+		logPicked = null;
 		if (pan)
 		{
 			panTo(r);
@@ -586,15 +664,21 @@ public class FairyRingAtlasPlugin extends Plugin
 	void clearSelection()
 	{
 		selected = null;
+		logPicked = null;
 		travelLog.restore();
 	}
 
-	/** Filter the travel log to the selection when allowed; otherwise leave it as the game drew it. */
+	/**
+	 * Filter the travel log to the selection when allowed; otherwise leave it as the game drew it.
+	 * Not when the dials already show the code (the next step is Teleport), nor for a code the
+	 * player picked in the log itself.
+	 */
 	private void applyLogFilter()
 	{
 		Ring r = repo.ring(selected);
 		// read the search live: the log rebuild can run before the varc change is announced
 		if (!config.filterTravelLog() || r == null || !currentSearch().isEmpty() || !repo.hasLogRow(r.getCode())
+			|| r.getCode().equals(logPicked) || Arrays.equals(DialMath.values(r.getCode()), dials())
 			|| !travelLog.apply(r, repo.favouriteSlot(r.getCode()), repo.getLogComponents(), config.selectedColor().getRGB() & 0xFFFFFF))
 		{
 			travelLog.restore();
@@ -789,12 +873,17 @@ public class FairyRingAtlasPlugin extends Plugin
 		panelScroll = Math.max(0, Math.min(panelScrollMax, panelScroll + dy));
 	}
 
+	/** Zoom about the centre, from where a running animation is heading so quick clicks compound evenly. */
 	void zoomCentre(double factor)
 	{
-		MapView v = view;
-		if (v != null)
+		synchronized (viewLock)
 		{
-			animateTo(v.zoomAbout(v.getX() + v.getW() / 2.0, v.getY() + v.getH() / 2.0, factor));
+			MapView v = view;
+			if (v != null)
+			{
+				MapView from = animTo != null ? animTo : v;
+				animateTo(from.zoomAbout(from.getX() + from.getW() / 2.0, from.getY() + from.getH() / 2.0, factor));
+			}
 		}
 	}
 
@@ -829,6 +918,19 @@ public class FairyRingAtlasPlugin extends Plugin
 			animateTo(Layer.SURFACE.equals(v.getLayer()) ? fitRings(v, repo.ringsIn(Layer.SURFACE), 0, in)
 				: v.fit(v.getBx0(), v.getBy0(), v.getBx1(), v.getBy1(), 12, in));
 		}
+	}
+
+	/** An Elsewhere card or a portal: open its layer, or fit the layer again when it is already open. */
+	void openCard(String id)
+	{
+		Layer l = repo.layer(id);
+		MapView v = view;
+		if (l != null && v != null && !l.isSurface() && l.getId().equals(v.getLayer()))
+		{
+			animateTo(fitLayer(l, v.rect(), insets(v.rect())));
+			return;
+		}
+		openLayer(id);
 	}
 
 	/** Switch to a layer: the surface comes back where it was left, other layers open fitted. */
@@ -906,6 +1008,7 @@ public class FairyRingAtlasPlugin extends Plugin
 		{
 			return;
 		}
+		menuFor = null;
 		Point mp = client.getMouseCanvasPosition();
 		int x = mp.getX();
 		int y = mp.getY();
@@ -930,7 +1033,8 @@ public class FairyRingAtlasPlugin extends Plugin
 		{
 			if (clear)
 			{
-				add(menu, "Clear selection", "", m -> clearSelection());
+				// below Cancel: a left press here pans or is absorbed, so Clear is right-click only
+				add(menu, 0, "Clear selection", "", m -> clearSelection());
 			}
 			return;
 		}
@@ -954,7 +1058,7 @@ public class FairyRingAtlasPlugin extends Plugin
 				break;
 			case CARD:
 			case PORTAL:
-				add(menu, hit.getOption(), hit.getTarget(), m -> openLayer(hit.getId()));
+				add(menu, hit.getOption(), hit.getTarget(), m -> openCard(hit.getId()));
 				break;
 			case BUTTON:
 				add(menu, hit.getOption(), hit.getTarget(), m -> button(hit.getId()));
@@ -962,6 +1066,25 @@ public class FairyRingAtlasPlugin extends Plugin
 			default:
 				break;
 		}
+		menuFor = menuKey(hit);
+	}
+
+	/**
+	 * A stable name for what a hit does, the same from frame to frame. A left press on an
+	 * actionable hit is let through only when the game's menu was built for that same hit:
+	 * the game runs the menu it built at the last frame's mouse position, which may hold
+	 * stale entries from outside the map or from a hole.
+	 */
+	static String menuKey(Hit hit)
+	{
+		return hit == null ? null : hit.getKind() + "|" + hit.getId() + "|" + (hit.getRing() == null ? null : hit.getRing().getCode() + " " + hit.getRing().getName());
+	}
+
+	/** Whether the game's current menu holds our entries for this hit. */
+	boolean isMenuFor(Hit hit)
+	{
+		String k = menuFor;
+		return k != null && k.equals(menuKey(hit));
 	}
 
 	/** Leaves only Cancel: no Walk here, no hidden rotate zones, no examine under the map. */
@@ -982,7 +1105,12 @@ public class FairyRingAtlasPlugin extends Plugin
 
 	private static void add(Menu menu, String option, String target, Consumer<MenuEntry> onClick)
 	{
-		menu.createMenuEntry(-1)
+		add(menu, -1, option, target, onClick);
+	}
+
+	private static void add(Menu menu, int index, String option, String target, Consumer<MenuEntry> onClick)
+	{
+		menu.createMenuEntry(index)
 			.setOption(option)
 			.setTarget(target == null || target.isEmpty() ? "" : ColorUtil.wrapWithColorTag(target, JagexColors.MENU_TARGET))
 			.setType(MenuAction.RUNELITE)

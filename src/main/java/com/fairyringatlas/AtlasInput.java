@@ -16,9 +16,10 @@ import net.runelite.client.input.MouseWheelListener;
 /**
  * Mouse input over the map, on the AWT thread. It touches only the plugin's volatile and
  * synchronised view state. Wheel zooms; a left press on empty map pans; a left press on a marker,
- * card or button is let through so the game runs our RUNELITE menu entry; right presses always go
- * through to open the menu we built. Nothing is consumed inside the holes, while a menu is open,
- * or outside the map.
+ * card or button is let through so the game runs our RUNELITE menu entry (swallowed instead when
+ * the game's menu was still built for something else, so no stale game entry runs); right presses
+ * always go through to open the menu we built. Nothing is consumed inside the holes, while a menu
+ * is open, or outside the map.
  */
 @Singleton
 public class AtlasInput extends MouseAdapter implements MouseWheelListener
@@ -69,9 +70,9 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			return e;
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
-		if (hit != null && hit.isActionable())
+		if (hit != null && hit.isActionable() && plugin.isMenuFor(hit))
 		{
-			// the game runs the top menu entry, which is ours
+			// the game runs the top menu entry, which is ours for this very hit
 			return e;
 		}
 		if (hit == null)
@@ -93,7 +94,8 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			plugin.panBy(e.getX() - lastX, e.getY() - lastY);
 			lastX = e.getX();
 			lastY = e.getY();
-			e.consume();
+			// not consumed: the game took no press, so to it this is a plain move, and its mouse
+			// position (hover, the info card, the next menu) keeps up with the pointer
 		}
 		return e;
 	}

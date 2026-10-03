@@ -7,9 +7,10 @@ map is a single 508x312 image at 0.18 px per game tile: no zoom, no pan,
 overlapping markers, off-map destinations shown only as a strip of 11 px
 icons, and the dials blocked while the map is showing.
 
-Research behind every decision here is in the session scratchpad
-(`research/*.md`). The facts that matter are restated below so this file is
-self-contained.
+The facts this spec relies on (interface ids, client scripts, varbits, cache
+tables, Plugin Hub reviewer rulings and Jagex's third-party client guidelines)
+are restated below, so this file is self-contained. Game facts were checked
+against the game cache and the Old School RuneScape Wiki.
 
 - Internal hub name: `fairy-ring-atlas`
 - Display name: "Fairy Ring Atlas"
@@ -58,9 +59,10 @@ reviewer rulings. Breaking one gets the plugin rejected.
    search when the log opens, and typing must keep working.
    - Search is read passively from `VarClientID.FAIRYRINGS_SEARCHSTRING` (1344).
    - No KeyListener. The plugin never opens or focuses windows.
-8. **Source size.** Keep `src/main` lean, because the review bot has a 200k
-   token budget for source. Generators live in `tools/` as standalone
-   projects. The root `settings.gradle` must not include them.
+8. **Source size.** The review bot counts only `src/main/java`, with comments
+   stripped, against a 200k-token budget (riktenx, plugin-hub #17419). Keep the
+   Java lean. Generators live in `tools/` as standalone projects. The root
+   `settings.gradle` must not include them.
 
 ---
 
@@ -253,15 +255,16 @@ research dataset.
     { "id": "zanaris", "name": "Zanaris", "bounds": [...], "background": "#000000" }
   ],
   "labels": [ { "t": "Lumbridge", "x": 3222, "y": 3218, "s": 1, "layer": "surface" } ],
-  "icons":  [ { "x": 3208, "y": 3220, "sprite": 1448 } ]
+  "icons":  [ [3208, 3220, 1448] ]            // [x, y, sprite] triples
 }
 ```
 
 - **Bounds** are inclusive-exclusive world tile bounds.
 - **`labels`** are world-map place names exported from the cache's world-map
   data. `s` is the size class: 0 small, 1 medium, 2 large.
-- **`icons`** are map-function icons. `sprite` is a game sprite id the plugin
-  draws through `SpriteManager`.
+- **`icons`** are map-function icons, written as compact `[x, y, sprite]`
+  triples because they are most of the file. `sprite` is a game sprite id the
+  plugin draws through `SpriteManager`.
 - Both are optional. If the cache API makes either impractical, ship an empty
   array and say so.
 
@@ -324,7 +327,8 @@ default (config `openInMapMode`). The overlay draws only while 398 is open.
 **Resizable mode.**
 
 1. Start from the usable area `avail`:
-   - the canvas, inset by 6 px;
+   - the canvas, inset by 6 px, grown to hold the dial rect when the dials
+     sit closer than 6 px to an edge (small or stretched resizable windows);
    - minus the side-panel or travel-log region: limit `avail.right` to the
      log's `x - 8` when the log is open and overlaps vertically, otherwise to
      the side panel's left edge;
@@ -479,8 +483,10 @@ marker) does the following:
   Teleport".
 - In Dial mode, the guidance arrows update live.
 
-**Deselecting:** right-click "Clear selection", the Esc-free toolbar
-"Clear" button, or selecting another ring. Deselecting restores the log.
+**Deselecting:** right-click "Clear selection" (on empty map and chrome it
+sits below Cancel, because a left press there pans or is absorbed), the
+Esc-free toolbar "Clear" button, or selecting another ring. Deselecting
+restores the log.
 
 **When the native search becomes non-empty:**
 - stop filtering the log and restore it;
@@ -493,7 +499,11 @@ marker) does the following:
 
 **Travel-log row clicks:** a `MenuOptionClicked` "Use code" on a 381 row
 selects that ring on the map and pans to it. This keeps the map in sync when
-the player uses the log directly.
+the player uses the log directly. The log is not filtered for a code picked
+this way: the player is already using it.
+
+**Dials matching the selection:** the filter is lifted (re-checked on
+`VarbitChanged` for 3985-3987), because the next step is Teleport.
 
 ### 4.6 Navigation
 
@@ -533,10 +543,17 @@ inside the map rect and **not** inside a hole. Its rules:
 - **Wheel:** zoom, consume.
 - **Left press:**
   - on a marker, button, card or portal: do not consume. The game runs the
-    top menu entry, which is our RUNELITE entry.
+    top menu entry, which is our RUNELITE entry. The game runs the menu it
+    built at the previous frame's mouse position, so the press is let through
+    only when `onPostMenuSort` built that menu for this same hit (a stable
+    key of kind, id and ring). Otherwise it is swallowed and the player
+    clicks again a frame later, so no stale game entry ("Walk here" from just
+    outside the map, "Confirm" from the Teleport hole) can run.
   - on empty map: start a drag and consume the press.
-- **Drag in progress:** pan, and consume dragged, released and clicked
-  events, even outside the bounds, until release.
+- **Drag in progress:** pan. Dragged events are passed on unconsumed: the game
+  took no press, so it treats them as plain moves and its mouse position
+  (hover, the info card, the next menu) follows the pointer. Released and
+  clicked events are consumed, even outside the bounds, until release.
 - **Right press:** do not consume. The game opens the menu we built.
 - **`mouseMoved`:** never consumed.
 
@@ -582,15 +599,25 @@ with the smallest `2^z ≥ p`. Draw each tile scaled by `p/2^z`:
 - NEAREST_NEIGHBOR when upscaling past 4 ppt (crisp pixel art).
 
 If that level's tile isn't ready yet, draw a coarser available level, scaled
-up, so the map fills in progressively. Never block the client thread on
-decoding.
+up, so the map fills in progressively, then any cached finer tiles (one or two
+levels finer, left over from before a zoom out) over it. Never block the
+client thread on decoding. An incomplete base map is rebuilt every 250 ms as
+a safety net.
 
 **`TileStore`.**
 - It loads PNGs with `getResourceAsStream` + `ImageIO.read`, off the client
   thread on the injected `ScheduledExecutorService`, or a single-thread
   executor of our own that is shut down in `shutDown`.
 - It keeps an LRU of decoded tiles, bounded by about 48 MB (one 256² INT_RGB
-  tile is 256 KB).
+  tile is 256 KB). The cap is soft: tiles drawn by the last two viewport
+  rebuilds are never evicted, so a view that needs more (2000x1400 just above
+  a level boundary) holds its tiles instead of evicting and re-decoding them
+  for ever.
+- Its one worker serves the newest request first, and drops a request the
+  latest rebuild did not repeat (every rebuild asks again for each tile it
+  still shows), so the current view never waits behind views already left.
+- About 30 s (50 ticks) after 398 closes, and at the login screen, the LRU,
+  the base-map cache, the chrome layer and the text sprites are released.
 - It derives levels between bundled levels by area-averaging 2×2 blocks
   (z=1 and z=0 from z=2, z=-2 and z=-3 from z=-1). Derived tiles are cached in
   the same LRU.
@@ -818,10 +845,12 @@ default font when `FontManager` is unavailable).
   per-frame data they draw from is `Scene`, with `Hit` for hit regions. None
   of them touches `Client`, so `MapPreview` renders exactly what the overlay
   draws. Dial-mode guidance lives in `AtlasOverlay`, as 5 allows.
-- **Size.** `src/main` is about 5,900 physical lines (about 5,100 without
-  comments and blank lines), above the 4,500 aim. Much of it is the
-  brace-per-line style. That is about 60k tokens, well inside the review
-  bot's budget.
+- **Size.** The review bot counts only `src/main/java`, with comments
+  stripped (riktenx on plugin-hub #17419), against its 200k-token budget.
+  Ours is about 178 KB of Java, roughly 50k tokens once comments are removed, so
+  `tools/`, `docs/` and the JSON resources do not matter for that budget.
+  `RingDataTest.javaSourceFitsTheReviewBudget` fails when `src/main/java`
+  passes 300,000 bytes, as an early warning.
 - **ASCII and vector glyphs instead of the spec's Unicode symbols.** The
   RuneScape fonts have no glyphs for the arrows, check mark, "▸"/"◂" or
   the em dash. The plugin draws them as vector shapes: the rotate arrows,
@@ -841,7 +870,9 @@ default font when `FontManager` is unavailable).
     results.
 - **Layout.** `MapLayout` generalises 4.2's cuts. Each obstacle (chat
   container, side panel or tab bars, travel log) cuts the usable area from
-  whichever side keeps the most room, with the dials still inside. The chat
+  whichever side clears it and keeps the most room. A cut never goes past the
+  dials' own edge, so the dials stay inside, and on a canvas too small for
+  any cut to clear an obstacle, the least overlapping cut is taken. The chat
   container counts even when the chat is collapsed, so the game's search box
   is never covered.
 - **Elsewhere panel.**
@@ -854,8 +885,10 @@ default font when `FontManager` is unavailable).
     and at most 62% of the map height.
   - When nothing is hovered or selected, a one-line hint shows instead.
   - Besides avoiding the holes, it avoids covering the ring it describes.
-  - Trap rings (`noStaffReturn`) get an amber "Bring your staff" line unless
-    the elite Lumbridge diary is done.
+  - Rings with the game's `noStaffReturn` flag get a grey line, "No staff
+    needed to leave: this ring can take you back to Zanaris", unless the
+    elite Lumbridge diary is done. The flag marks a place you may leave by
+    the ring without a staff; it is not a trap warning.
 - **Toolbar.**
   - `+` and `-` zoom by x1.5 about the centre, animated.
   - `Clear` appears only while there is a selection.
@@ -869,11 +902,16 @@ default font when `FontManager` is unavailable).
   (when visible) is drawn. Favourite rows are found from the `FAVE_CODE_n`
   texts first, then the `FAIRYRING_FAVE_n` varbit slot.
 - **Fairy Ring Map detection** uses the plugin class name only, not the
-  widget tag.
-- **Clue helper.** It uses the first location of a `LocationClueScroll` or
-  `LocationsClueScroll`, read with `getLocations(null)`. Clue types that need
-  the Clue Scroll plugin instance are skipped. A fairy ring clue's code is
-  taken from the first three letters of its text.
+  widget tag. The descriptor also declares `conflicts = "Fairy Ring Map"`, so
+  RuneLite offers to disable the other plugin when either is enabled.
+- **Clue helper.** A `LocationClueScroll` is read with `getLocation(null)`;
+  for a hot-cold clue that is the dig spot once solved, and nothing before. A
+  clue that is only a `LocationsClueScroll` (a three-step cryptic) is marked
+  only when exactly one location is left, because its list holds unsolved
+  steps or candidates. Clue types that need the Clue Scroll plugin instance
+  are skipped. A fairy ring clue's code is taken from the first three letters
+  of its text. It needs the core Clue Scroll plugin to be enabled:
+  `@PluginDependency` loads it but does not turn it on.
 - **DB coord column.** It was verified in the injected client 1.13.1:
   `getDBTableField(row, col, tuple)` returns the stored values for one tuple
   element, so the coord is an `Integer` packed as `plane<<28 | x<<14 | y`.
@@ -925,3 +963,43 @@ default font when `FontManager` is unavailable).
 - **No code label for a marker under the chrome.** When a marker sits under
   the top bar, the Elsewhere panel or the card, its code label is not drawn.
   Before, a label could point at a ring the player couldn't see.
+
+### Review fixes
+
+- **Travel log.** Selecting a second ring while the log is filtered restores
+  the log before looking up the new row (the old filter had hidden it). On a
+  log rebuild (proc 8080), the dropped records still put back the text
+  colours, which 8080 never resets; otherwise our selection colour was later
+  "restored" as the original.
+- **Game states.** `LOADING` and `CONNECTION_LOST` no longer count as a close:
+  the interfaces and our hides survive them, and a real close is still caught
+  by `WidgetClosed` or the per-tick check. Before, Dial mode could come back
+  with the dials hidden for good.
+- **Search** is read as the game's filter reads it: lower case, cut to 30
+  characters, not trimmed.
+- **Info card.** The "Click a fairy ring" hint is a label obstacle and absorbs
+  presses like the card. The top bar obstacle includes the Fairy Ring Map
+  notice strip. Markers inside a hole get no code label. The collapsed
+  Elsewhere tab is outlined (and flashes) when the search matches a ring on
+  another layer. While a right-click menu is open, the card keeps describing
+  the ring it was opened on.
+- **Toolbar.** `+`/`-` compound from the running animation's target, and
+  clicking the active Elsewhere card fits its layer again.
+- **Chrome cache key** hashes the hovered hit by value (it hashed a fresh
+  object's identity, which rebuilt the chrome every frame under the mouse).
+- **Tiles** are decoded in memory (`MemoryCacheImageInputStream`), not through
+  ImageIO's temp-file cache.
+- **Shutdown** runs everything that the client thread uses (overlay caches,
+  view, tile store and executor) on the client thread, after the overlay is
+  removed.
+- **New codes from the DB table** are named from `COL_DESC` without its tags,
+  split into area and name at the colon.
+- **Data.** Bosses reached from a ring are in its POIs and tags: Yama (DJR),
+  the Royal Titans (AIQ), Araxxor and the Morytania Spider Cave (ALQ) and the
+  Grotesque Guardians (CKS). CJQ lists every start requirement of Troubled
+  Tortugans. The BLS Mountain Guide note says the lift must first be unlocked
+  at the summit. `ring_display.json` may list a dataset requirement the wiki
+  does not state for that ring under `unconfirmed`; BLS's Kourend visit is
+  told as a note instead of an amber requirement. The Mor Ul Rek "Fight Cave"
+  label is moved from the arena instance to the cave entrance north of BLP
+  (`LABEL_MOVES` in `mapgen.py`).

@@ -32,30 +32,35 @@ public class ClueHelper
 		this.service = service;
 	}
 
-	/** The active clue's world location, or null. */
+	/**
+	 * The active clue's world location, or null. A clue with a single answer gives it through
+	 * {@code getLocation} (a hot-cold clue only once it is solved). A clue with only a list of
+	 * locations is marked only when exactly one is left: the list of a hot-cold or three-step clue
+	 * holds candidates or unsolved steps, and marking an arbitrary one would point at the wrong ring.
+	 */
 	public WorldPoint location()
 	{
 		try
 		{
 			ClueScroll clue = service.getClue();
-			WorldPoint[] points = null;
+			if (clue instanceof LocationClueScroll)
+			{
+				return ((LocationClueScroll) clue).getLocation(null);
+			}
 			if (clue instanceof LocationsClueScroll)
 			{
-				points = ((LocationsClueScroll) clue).getLocations(null);
-			}
-			else if (clue instanceof LocationClueScroll)
-			{
-				points = ((LocationClueScroll) clue).getLocations(null);
-			}
-			if (points != null)
-			{
-				for (WorldPoint p : points)
+				WorldPoint[] points = ((LocationsClueScroll) clue).getLocations(null);
+				WorldPoint only = null;
+				int n = 0;
+				for (WorldPoint p : points == null ? new WorldPoint[0] : points)
 				{
 					if (p != null)
 					{
-						return p;
+						only = p;
+						n++;
 					}
 				}
+				return n == 1 ? only : null;
 			}
 		}
 		catch (RuntimeException | LinkageError e)

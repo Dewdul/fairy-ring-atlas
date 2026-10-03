@@ -300,7 +300,7 @@ public class AtlasPainter
 				double rad = radius(v.getPpt(), (f & SELECTED) != 0);
 				int px = (int) v.screenX(r.getX() + 0.5);
 				int py = (int) v.screenY(r.getY() + 0.5);
-				if (covered(s.topBar, px, py) || covered(s.panel, px, py) || covered(s.card, px, py))
+				if (covered(s.topBar, px, py) || covered(s.panel, px, py) || covered(s.card, px, py) || inHole(s, px, py))
 				{
 					// the marker is under the chrome; a label beside it would point at nothing
 					continue;
@@ -746,6 +746,18 @@ public class AtlasPainter
 	private static boolean covered(Rectangle r, int x, int y)
 	{
 		return r != null && r.contains(x, y);
+	}
+
+	private static boolean inHole(Scene s, int x, int y)
+	{
+		for (Rectangle h : s.holes)
+		{
+			if (h.contains(x, y))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	static Rectangle grow(Rectangle r, int n)

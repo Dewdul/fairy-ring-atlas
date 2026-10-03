@@ -11,29 +11,29 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
   - what is nearby;
   - quest, skill and item requirements;
   - dangers;
-  - a warning on rings where you need your staff to get back.
+  - on rings you can leave without a staff, a line saying so (unless you have the elite Lumbridge & Draynor Diary).
 - **Marker states.** Markers show at a glance which rings are in your travel log, which are favourites, your last destination, the ring you are standing at and the code currently on the dials.
 - **Travel log search.** Typing in the game's own travel log search dims the rings that don't match and zooms the map to the ones that do.
-- **Clue helper.** The map marks your active clue location, and a fairy ring clue's code is selected for you.
+- **Clue helper.** The map marks your active clue location, and a fairy ring clue's code is selected for you. This needs the core *Clue Scroll* plugin to be enabled. A hot-cold clue is marked once it is solved.
 
 ## How to use it
 
 1. Use a fairy ring. The map opens over the dials. The real **Teleport** and close buttons stay visible and work as normal.
 2. **Click a ring** to select it. The card at the bottom then tells you the next step:
-   - **The ring is in your travel log.** The log is narrowed to that code and its row is highlighted. Click the row (*Use code*), then click **Teleport**.
+   - **The ring is in your travel log.** The log is narrowed to that code and its row is highlighted. Click the row (*Use code*), then click **Teleport**. If you click a row in the log yourself, the map follows and the log is left as it is.
    - **The ring is not in your travel log yet.** Click **Show dials**. Arrows on the real dials show which way to turn each one and how many times. Turn the dials, then click **Teleport**. The **Map** button takes you back to the map.
    - **The dials already show the code.** The card reads *Ready: click Teleport* and the Teleport button pulses.
 3. To navigate:
    - **Mouse wheel:** zoom.
    - **Drag:** pan.
    - **`+` / `-`:** zoom in and out.
-   - **Fit:** show every ring.
+   - **Fit:** show every ring on this map (on an underground map, the whole area).
    - **Dials:** switch to the plain dials.
-   - **Right-click a ring:** *Zoom to*, or *Clear selection*.
+   - **Right-click a ring:** *Zoom to*, or *Clear selection*. Right-click anywhere else on the map, or press **Clear**, to clear the selection.
 
 ### Why clicking the map doesn't teleport you
 
-RuneLite plugins may not act in the game for you. They can't send clicks, turn dials or choose a travel log entry. A click on the map therefore only selects a ring. The plugin then highlights the real log row, or shows you the dial turns, and you make those clicks yourself. The plugin only hides, moves and recolours the fairy ring interface's own parts while the map is open, and it puts everything back when you close it.
+RuneLite plugins may not act in the game for you. They can't send clicks, turn dials or choose a travel log entry. A click on the map therefore only selects a ring. The plugin then highlights the real log row, or shows you the dial turns, and you make those clicks yourself. The plugin changes the fairy ring interfaces only while they are open: it hides the dials under the map, and narrows and recolours the travel log (in map or dial mode). Under the map it also removes the game's own right-click options, such as *Walk here*. It puts everything back when you close the interface.
 
 ## Settings
 
@@ -41,7 +41,7 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 |---|---|---|---|
 | Map | Open as map | on | Start with the map rather than the dials |
 | | Max width / Max height | 1100 / 720 | Largest map size in resizable mode |
-| | Start view | Fit all | *Fit all* rings, centre *Around you*, or *Remember* the last view |
+| | Start view | Fit all | *Fit all* rings, centre *Around you*, or *Remember* the last view this session |
 | | Place names / Map icons | on | World map place names, and icons when zoomed in |
 | | Fit to search | on | Zoom to the rings that match the travel log search |
 | Markers | Code labels | All | Show codes for *All* rings, *Favourites* only, or *None* |
@@ -49,13 +49,14 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 | | Visited / Selected / Favourite colour | teal / orange / gold | Marker colours |
 | Travel log | Filter travel log | on | Narrow the log to the selected ring, moved to the top |
 | | Dial guidance | on | Turn arrows on the dials for the selected ring |
-| Advanced | Clue helper | on | Mark the active clue and preselect fairy ring clue codes |
+| Advanced | Clue helper | on | Mark the active clue and preselect fairy ring clue codes (needs the core Clue Scroll plugin) |
 
 ## Notes
 
 - **Stretched mode.** The map is drawn at the game's own resolution and then stretched along with the rest of the game. It can't be sharper than the game itself.
 - **Fixed mode.** The map fills the dial area. The *Elsewhere* panel starts collapsed, and you can open it with its tab.
-- **Fairy Ring Map.** That plugin also draws over the dials. If both plugins are on, the map shows a notice asking you to turn one of them off.
+- **Fairy Ring Map.** That plugin also draws over the dials, so the two are marked as conflicting: RuneLite offers to turn the other off when you enable one. If both are on anyway, the map shows a notice asking you to turn one of them off.
+- **Memory.** About 30 seconds after you close the fairy ring, the plugin frees its decoded map tiles and image buffers.
 
 ## Data sources
 

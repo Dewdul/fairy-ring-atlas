@@ -263,9 +263,13 @@ def build(dataset, display, portals_doc):
 
         # requirements must not drop anything the dataset requires
         # (optional / recommended items are advice, not unlock requirements; they live in notes)
+        # a display entry may list dataset requirements the wiki does not state for this ring
+        # ('unconfirmed'); those are told in notes, not shown as requirement lines
+        unconfirmed = d.get('unconfirmed', [])
         needed = [r for r in e.get('requirements', [])
                   if 'optional' not in str(r.get('detail', '')).lower()
-                  and not str(r.get('detail', '')).lower().startswith('recommended')]
+                  and not str(r.get('detail', '')).lower().startswith('recommended')
+                  and r['name'] not in unconfirmed]
         if needed and not ring['requirements']:
             errors.append('%s: dataset has requirements %s but the display has none'
                           % (where, [r['name'] for r in needed]))

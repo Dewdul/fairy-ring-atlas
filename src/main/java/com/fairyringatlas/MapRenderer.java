@@ -96,6 +96,28 @@ public final class MapRenderer
 							break;
 						}
 					}
+					// after a zoom out the finer tiles are often still cached: draw them over the
+					// coarse fallback, so the map stays sharp instead of flashing blurry
+					for (int fz = Math.min(z + 2, store.getMaxLevel()); fz > z; fz--)
+					{
+						int n = 1 << (fz - z);
+						double cs = span / n;
+						for (int dy = 0; dy < n; dy++)
+						{
+							for (int dx = 0; dx < n; dx++)
+							{
+								BufferedImage child = store.get(fz, tx * n + dx, ty * n + dy);
+								if (child != null)
+								{
+									int ax0 = (int) Math.round((tx * span + dx * cs - left) * ppt);
+									int ax1 = (int) Math.round((tx * span + (dx + 1) * cs - left) * ppt);
+									int ay0 = (int) Math.round((top - (ty * span + (dy + 1) * cs)) * ppt);
+									int ay1 = (int) Math.round((top - (ty * span + dy * cs)) * ppt);
+									draw(g, child, ax0, ay0, ax1, ay1, 0, 0, TileStore.TILE);
+								}
+							}
+						}
+					}
 				}
 			}
 			return complete;

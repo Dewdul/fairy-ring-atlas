@@ -61,7 +61,7 @@ public interface FairyRingAtlasConfig extends Config
 	}
 
 	@ConfigItem(keyName = "startView", name = "Start view",
-		description = "Fit all rings, centre on the ring you are standing at, or remember the last view",
+		description = "Fit all rings, centre on the ring you are standing at, or remember the last view this session",
 		section = mapSection, position = 3)
 	default StartView startView()
 	{
@@ -139,7 +139,7 @@ public interface FairyRingAtlasConfig extends Config
 	}
 
 	@ConfigItem(keyName = "clueHelper", name = "Clue helper",
-		description = "Mark the active clue step on the map and preselect fairy ring clue codes", section = advancedSection, position = 0)
+		description = "Mark the active clue step on the map and preselect fairy ring clue codes. Needs the core Clue Scroll plugin to be enabled", section = advancedSection, position = 0)
 	default boolean clueHelper()
 	{
 		return true;
