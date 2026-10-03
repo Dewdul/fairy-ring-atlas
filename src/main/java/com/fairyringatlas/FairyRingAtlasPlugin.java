@@ -84,6 +84,8 @@ public class FairyRingAtlasPlugin extends Plugin
 	private static final long ANIM_MS = 250;
 	/** The game's fairy ring search keeps at most this many characters. */
 	private static final int SEARCH_MAX = 30;
+	/** A favourite picked from the side panel is shown at no less than this zoom. */
+	private static final double FAVOURITE_PPT = 2;
 	private static final String FRM_CLASS = "com.fairyringmap.FairyRingMapPlugin";
 
 	/** Components of 398 hidden in map mode; CONFIRM, the close button, the backdrop and its ornament stay. */
@@ -909,6 +911,18 @@ public class FairyRingAtlasPlugin extends Plugin
 		animateTo(v.focusOn(r.getX() + 0.5, r.getY() + 0.5, Math.max(v.getPpt() * 2, 4), insets(v.rect())));
 	}
 
+	/** A row in the Favourites list: select the ring and bring it into view, close enough to read. */
+	void showFavourite(Ring r)
+	{
+		select(r.getCode(), false);
+		if (r.isMapped() && view != null)
+		{
+			openLayer(r.getLayer());
+			MapView v = view;
+			animateTo(v.focusOn(r.getX() + 0.5, r.getY() + 0.5, Math.max(v.getPpt(), FAVOURITE_PPT), insets(v.rect())));
+		}
+	}
+
 	void fit()
 	{
 		MapView v = view;
@@ -1053,7 +1067,8 @@ public class FairyRingAtlasPlugin extends Plugin
 				}
 				if (r.isDialable())
 				{
-					add(menu, "Select", hit.getTarget(), m -> select(r.getCode(), hit.getKind() == Hit.Kind.CHIP));
+					add(menu, "Select", hit.getTarget(), Hit.FAVE.equals(hit.getId()) ? m -> showFavourite(r)
+						: m -> select(r.getCode(), hit.getKind() == Hit.Kind.CHIP));
 				}
 				break;
 			case CARD:

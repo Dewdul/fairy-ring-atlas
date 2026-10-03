@@ -51,6 +51,8 @@ public class MapPreview
 		faves.put("AIQ", 0);
 		faves.put("CKS", 1);
 		faves.put("DKR", 2);
+		faves.put("BKS", 3);
+		faves.put("DLS", 4);
 		repo.setState(visited, faves, "DKR");
 
 		AtlasPainter painter = new AtlasPainter();

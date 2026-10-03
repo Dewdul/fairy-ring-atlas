@@ -1003,3 +1003,16 @@ default font when `FontManager` is unavailable).
   told as a note instead of an amber requirement. The Mor Ul Rek "Fight Cave"
   label is moved from the arena instance to the cave entrance north of BLP
   (`LABEL_MOVES` in `mapgen.py`).
+
+### Favourites list (added 2026-10-03, at the user's request)
+
+- The side panel starts with a **Favourites** section above *Elsewhere*. It lists the
+  player's in-game favourites in favourites-block order (`RingRepository.favouriteRings`),
+  each row a code chip plus the ring's name. A row is a `CHIP` hit with id `Hit.FAVE`.
+  Left-click selects the ring and focuses it at no less than 2 ppt, switching layer when
+  needed. Rows dim with the search like the cards. With no favourites, a grey line says
+  to star a code in the travel log.
+- The info card adds a hint line for a favourite, "1 click: right-click any fairy ring >
+  Favourites > CODE", and for the last destination, "... > Last-destination (CODE)".
+  These point at the game's own one-click teleports; the plugin adds nothing to the ring's
+  menu.

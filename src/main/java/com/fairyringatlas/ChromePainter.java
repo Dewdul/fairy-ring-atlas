@@ -21,7 +21,7 @@ import java.util.List;
 
 /**
  * The map's chrome in an OSRS style: dark stone frame, the top bar with breadcrumb, dial readout
- * and buttons, the Elsewhere panel of off-surface layers, the info card and the frames around the
+ * and buttons, the side panel (Favourites, then Elsewhere: the off-surface layers), the info card and the frames around the
  * holes left for the real Teleport and close buttons. Needs no game client.
  */
 public class ChromePainter
@@ -30,6 +30,8 @@ public class ChromePainter
 	static final int PANEL_W = 150;
 	static final int CARD_W = 340;
 	static final int CARD_MAX_H = 260;
+	/** Menu target of the panel's show/hide toggle. */
+	private static final String PANEL_NAME = "Favourites and Elsewhere";
 
 	static final Color FRAME = new Color(0x1e1a14);
 	static final Color BRONZE = new Color(0x6b5a40);
@@ -60,8 +62,7 @@ public class ChromePainter
 		// the card painted last; the map painter keeps labels from hiding half under it
 		s.card = layerCard != null && v.rect().contains(layerCard) ? layerCard : null;
 		int top = v.getY() + BAR_H + (s.notice != null ? 18 : 0) + 6;
-		boolean hasCards = !cards(s).isEmpty();
-		if (!hasCards)
+		if (cards(s).isEmpty() && s.repo.favouriteRings().isEmpty())
 		{
 			s.panel = null;
 		}
@@ -313,7 +314,7 @@ public class ChromePainter
 		panelBox(g, p);
 		if (s.panelCollapsed)
 		{
-			s.hits.add(new Hit(Hit.Kind.BUTTON, p, null, Hit.TOGGLE_PANEL, "Show", "Elsewhere"));
+			s.hits.add(new Hit(Hit.Kind.BUTTON, p, null, Hit.TOGGLE_PANEL, "Show", PANEL_NAME));
 			// the search matches a ring elsewhere: the tab says so (and flashes with the cards)
 			boolean matches = false;
 			for (Card c : cards(s))
@@ -340,15 +341,17 @@ public class ChromePainter
 		}
 		s.hits.add(new Hit(Hit.Kind.PANEL, p, null, null, null, null));
 		int sh = ink.height(ink.small);
-		ink.text(g, "Elsewhere", ink.bold, TITLE, p.x + 6, p.y + 4, Ink.Style.SHADOW);
+		ink.text(g, "Favourites", ink.bold, TITLE, p.x + 6, p.y + 4, Ink.Style.SHADOW);
 		Rectangle toggle = new Rectangle(p.x + p.width - 20, p.y + 3, 16, 15);
-		button(g, s, toggle, "", Hit.TOGGLE_PANEL, "Hide", "Elsewhere");
+		button(g, s, toggle, "", Hit.TOGGLE_PANEL, "Hide", PANEL_NAME);
 		triangle(g, toggle.x + 8, toggle.y + 7.5, 3.5, false, CREAM);
 
 		Rectangle content = new Rectangle(p.x + 4, p.y + 22, p.width - 8, p.height - 26);
 		Shape oldClip = g.getClip();
 		g.clip(content);
-		int y = content.y - s.panelScroll;
+		int y = paintFavourites(g, s, content, content.y - s.panelScroll);
+		ink.text(g, "Elsewhere", ink.bold, TITLE, content.x + 2, y, Ink.Style.SHADOW);
+		y += ink.height(ink.bold) + 4;
 		Layer active = s.repo.layer(s.view.getLayer());
 		boolean flash = s.now < s.flashUntil && (s.now / 250) % 2 == 0;
 		Composite oldComp = g.getComposite();
@@ -422,6 +425,55 @@ public class ChromePainter
 			chevron(g, p.x + p.width / 2.0, content.y + content.height - 3, 1);
 		}
 		panelScrollMax = Math.max(0, overflow);
+	}
+
+	/**
+	 * The Favourites list at the top of the panel, one row per favourite in favourites-block
+	 * order. Returns the y below it.
+	 */
+	private int paintFavourites(Graphics2D g, Scene s, Rectangle content, int y)
+	{
+		int sh = ink.height(ink.small);
+		List<Ring> faves = s.repo.favouriteRings();
+		if (faves.isEmpty())
+		{
+			for (String t : ink.wrap("Star a code in your travel log to list it here.", ink.small, content.width - 8))
+			{
+				ink.text(g, t, ink.small, GREY, content.x + 4, y + 2, Ink.Style.SHADOW);
+				y += sh;
+			}
+			return y + 12;
+		}
+		Composite oldComp = g.getComposite();
+		for (Ring r : faves)
+		{
+			Rectangle row = new Rectangle(content.x, y, content.width, sh + 6);
+			boolean sel = r.getCode().equals(s.selected);
+			boolean hover = s.mouse != null && row.contains(s.mouse) && content.contains(s.mouse);
+			if (s.searching() && !r.matches(s.query))
+			{
+				g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
+			}
+			if (sel || hover)
+			{
+				g.setColor(sel ? new Color(70, 52, 30, 240) : FILL_LIGHT);
+				g.fillRoundRect(row.x, row.y, row.width, row.height, 6, 6);
+				g.setColor(sel ? TITLE : BRONZE_LIGHT);
+				g.setStroke(new BasicStroke(1f));
+				g.drawRoundRect(row.x, row.y, row.width - 1, row.height - 1, 6, 6);
+			}
+			Rectangle chip = new Rectangle(row.x + 3, row.y + 2, ink.width(ink.small, r.getCode()) + 8, sh + 2);
+			chip(g, s, r, chip);
+			int tx = chip.x + chip.width + 5;
+			ink.text(g, ink.fit(r.getName(), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
+			g.setComposite(oldComp);
+			if (content.intersects(row))
+			{
+				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, Hit.FAVE, "Select", r.getCode() + " " + r.getName()));
+			}
+			y += row.height + 2;
+		}
+		return y + 8;
 	}
 
 	/** Largest useful panel scroll of the last paint, for the input handler to clamp to. */
@@ -539,6 +591,13 @@ public class ChromePainter
 				status.append(" - you are here");
 			}
 			lines.add(new Line(ink.fit(status.toString(), ink.small, textW), ink.small, visited ? s.visitedColor : GREY, 2));
+			// the game's own one-click teleports from any ring, without opening the dials
+			String oneClick = s.repo.isFavourite(ring.getCode()) ? "Favourites > " + ring.getCode()
+				: ring.getCode().equals(s.repo.getLastCode()) ? "Last-destination (" + ring.getCode() + ")" : null;
+			if (oneClick != null)
+			{
+				addWrapped(lines, "1 click: right-click any fairy ring > " + oneClick, ink.small, HINT, textW, 0);
+			}
 		}
 		addWrapped(lines, ring.getDescription(), ink.regular, Color.WHITE, textW, 4);
 		boolean first = true;

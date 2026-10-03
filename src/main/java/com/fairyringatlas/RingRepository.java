@@ -382,6 +382,23 @@ public class RingRepository
 		return s == null ? -1 : s;
 	}
 
+	/** The favourite rings in favourites-block order. */
+	public List<Ring> favouriteRings()
+	{
+		List<Map.Entry<String, Integer>> slots = new ArrayList<>(favourites.entrySet());
+		slots.sort(Map.Entry.<String, Integer>comparingByValue().thenComparing(Map.Entry.comparingByKey()));
+		List<Ring> out = new ArrayList<>();
+		for (Map.Entry<String, Integer> e : slots)
+		{
+			Ring r = byCode.get(e.getKey());
+			if (r != null)
+			{
+				out.add(r);
+			}
+		}
+		return out;
+	}
+
 	/** Whether the code can be used from the travel log: visited or favourite. */
 	public boolean hasLogRow(String code)
 	{

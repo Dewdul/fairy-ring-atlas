@@ -20,7 +20,7 @@ public class Hit
 	{
 		/** A ring marker; ring is set. */
 		MARKER,
-		/** A ring chip in an Elsewhere card; ring is set. */
+		/** A ring chip in an Elsewhere card, or a Favourites row (id FAVE); ring is set. */
 		CHIP,
 		/** An Elsewhere card; id is the layer id (or "poh"). */
 		CARD,
@@ -42,6 +42,8 @@ public class Hit
 	public static final String BACK = "back";
 	public static final String TOGGLE_PANEL = "panel";
 	public static final String SHOW_MAP = "map";
+	/** Id of a ring row in the panel's Favourites list. */
+	public static final String FAVE = "fave";
 
 	Kind kind;
 	Rectangle area;

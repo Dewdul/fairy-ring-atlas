@@ -353,4 +353,23 @@ public class RingDataTest
 		assertEquals(-1, repo.favouriteSlot("AIQ"));
 		assertEquals("AIQ", repo.getLastCode());
 	}
+
+	@Test
+	public void favouritesListInBlockOrder()
+	{
+		RingRepository repo = real();
+		Map<String, Integer> faves = new java.util.HashMap<>();
+		faves.put("DLS", 2);
+		faves.put("AIQ", 0);
+		faves.put("BKS", 1);
+		faves.put("ZZZ", 3);
+		repo.setState(new HashSet<>(), faves, null);
+		List<String> codes = new java.util.ArrayList<>();
+		for (Ring r : repo.favouriteRings())
+		{
+			codes.add(r.getCode());
+		}
+		// unknown codes are left out
+		assertEquals(Arrays.asList("AIQ", "BKS", "DLS"), codes);
+	}
 }

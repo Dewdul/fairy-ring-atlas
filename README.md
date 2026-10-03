@@ -5,7 +5,8 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 ## Features
 
 - **Map of every ring.** All 42 surface rings appear on a world map. You can zoom from an overview of the whole map down to individual buildings: scroll to zoom and drag to pan.
-- **Off-surface destinations.** These include Zanaris, the Abyss, Mor Ul Rek, the Cosmic entity's plane and the other realms. Each one has a map of its own, opened from the *Elsewhere* panel or from a portal marker on the surface. *Your house* (DIQ) has a card.
+- **Favourites list.** Your in-game favourites (starred in the travel log) are listed at the top of the side panel. Click one to select it and zoom to it. Its card also reminds you of the game's own one-click teleport: right-click any fairy ring, then *Favourites*. Your last destination gets the same tip for *Last-destination*.
+- **Off-surface destinations.** These include Zanaris, the Abyss, Mor Ul Rek, the Cosmic entity's plane and the other realms. Each one has a map of its own, opened from the *Elsewhere* section of the side panel or from a portal marker on the surface. *Your house* (DIQ) has a card.
 - **Ring cards.** Hover over any ring for its code, name and area. The card also shows:
   - whether the ring is in your travel log;
   - what is nearby;
@@ -54,7 +55,7 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 ## Notes
 
 - **Stretched mode.** The map is drawn at the game's own resolution and then stretched along with the rest of the game. It can't be sharper than the game itself.
-- **Fixed mode.** The map fills the dial area. The *Elsewhere* panel starts collapsed, and you can open it with its tab.
+- **Fixed mode.** The map fills the dial area. The side panel (*Favourites* and *Elsewhere*) starts collapsed, and you can open it with its tab.
 - **Fairy Ring Map.** That plugin also draws over the dials, so the two are marked as conflicting: RuneLite offers to turn the other off when you enable one. If both are on anyway, the map shows a notice asking you to turn one of them off.
 - **Memory.** About 30 seconds after you close the fairy ring, the plugin frees its decoded map tiles and image buffers.
 
