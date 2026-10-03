@@ -355,6 +355,25 @@ public class RingDataTest
 	}
 
 	@Test
+	public void teleportUncoveredOnlyWhenTheDialsAreWorthUsing()
+	{
+		Scene s = new Scene();
+		s.repo = real();
+		s.dials = new int[]{0, 0, 0};
+		// AIP is an unused code: the game shows "Invalid location"
+		assertFalse(s.teleportShown());
+		s.dials = DialMath.values("CKS");
+		assertTrue(s.teleportShown());
+		// a selection hides Teleport until the dials show it, so the old code is not used by mistake
+		s.selected = "AIQ";
+		assertFalse(s.teleportShown());
+		s.dials = DialMath.values("AIQ");
+		assertTrue(s.teleportShown());
+		s.dials = null;
+		assertFalse(s.teleportShown());
+	}
+
+	@Test
 	public void favouritesListInBlockOrder()
 	{
 		RingRepository repo = real();

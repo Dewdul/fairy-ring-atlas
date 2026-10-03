@@ -174,22 +174,28 @@ public class MapPreview
 		TileStore tiles = new TileStore(repo.getIndex(), repo.getLayers(), BASE, Runnable::run);
 		ChromePainter chrome = new ChromePainter(painter.ink());
 		Rectangle rect = v.rect();
-		// the dial interface is centred in the map; its Teleport and close buttons are holes
-		int dx = fixedMode ? rect.x : rect.x + rect.width / 2 - 256;
-		int dy = fixedMode ? rect.y : rect.y + rect.height / 2 - 167;
-		Rectangle confirm = new Rectangle(dx + 172, dy + 254, 169, 53);
+		// the map hangs from the dials' top-right corner; close and the moved Teleport are holes
+		int dx = rect.x + rect.width - 512;
+		int dy = rect.y;
+		int[] m = FairyRingAtlasPlugin.MOVED_IN_MAP[0];
+		Rectangle confirm = new Rectangle(dx + m[1], dy + m[2], m[3], m[4]);
 		Rectangle close = new Rectangle(dx + 476, dy + 10, 26, 23);
 
 		Scene s = new Scene();
 		s.repo = repo;
 		s.view = v;
-		s.holes.add(confirm);
-		s.holes.add(close);
-		s.confirmHole = confirm;
 		s.selected = selected;
 		s.hovered = repo.ring(hovered);
 		s.here = "DKR";
 		s.dials = dials;
+		// as in the overlay: Teleport is a hole only when the dials are worth using
+		if (s.teleportShown())
+		{
+			s.holes.add(confirm);
+			s.confirmHole = confirm;
+		}
+		s.holes.add(close);
+		s.teleportSlot = confirm;
 		s.now = 400;
 		s.panelCollapsed = fixedMode;
 		s.clueX = 3110;
@@ -202,10 +208,11 @@ public class MapPreview
 		g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
 		g.setColor(new Color(0x404640));
 		g.fillRect(dx, dy, 512, 334);
-		g.setColor(new Color(0x6b5a40));
+		// stand-ins for the game's parchment Teleport and its close button
+		g.setColor(new Color(0xC8B48A));
 		g.fill(confirm);
-		g.setColor(Color.WHITE);
-		g.drawString("Teleport to this location", confirm.x + 18, confirm.y + 30);
+		g.setColor(new Color(0x402000));
+		g.drawString("Teleport to this location", confirm.x + 18, confirm.y + 18);
 		g.setColor(new Color(0x8a2a1a));
 		g.fill(close);
 
@@ -222,8 +229,10 @@ public class MapPreview
 		chrome.paintShadow(g, s);
 		Shape clip = g.getClip();
 		Area a = new Area(rect);
-		a.subtract(new Area(confirm));
-		a.subtract(new Area(close));
+		for (Rectangle h : s.holes)
+		{
+			a.subtract(new Area(h));
+		}
 		g.clip(a);
 		g.drawImage(base, rect.x, rect.y, null);
 		painter.paintMap(g, s);

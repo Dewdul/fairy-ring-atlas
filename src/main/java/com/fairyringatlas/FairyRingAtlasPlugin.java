@@ -100,6 +100,15 @@ public class FairyRingAtlasPlugin extends Plugin
 		InterfaceID.Fairyrings._2_CLOCKWISE, InterfaceID.Fairyrings._2_ANTICLOCKWISE,
 		InterfaceID.Fairyrings._3_CLOCKWISE, InterfaceID.Fairyrings._3_ANTICLOCKWISE,
 	};
+	/**
+	 * Components of 398 moved in map mode, with their place inside the dials (x, y, width,
+	 * height): Teleport and the parchment plaque drawn behind it go to the top bar, just left of
+	 * the close button, instead of sitting in the middle of the map.
+	 */
+	static final int[][] MOVED_IN_MAP = {
+		{InterfaceID.Fairyrings.CONFIRM, 299, 5, 169, 27},
+		{InterfaceID.Fairyrings.ROOT_MODEL25, 368, 2, 32, 32},
+	};
 	/** Rotate zones per dial: clockwise, anticlockwise. */
 	static final int[][] ZONES = {
 		{InterfaceID.Fairyrings._1_CLOCKWISE, InterfaceID.Fairyrings._1_ANTICLOCKWISE},
@@ -188,6 +197,8 @@ public class FairyRingAtlasPlugin extends Plugin
 	private MapView sessionView;
 	private final Map<String, MapView> layerViews = new HashMap<>();
 	private final Set<Integer> hiddenByUs = new HashSet<>();
+	/** Original x, y, width and height of the components we moved, by component id. */
+	private final Map<Integer, int[]> movedByUs = new HashMap<>();
 	/** The code the player picked in the travel log itself; the log is not filtered for it. */
 	private String logPicked;
 	/** Whether the decoded tiles and map-sized caches were released since the interface closed. */
@@ -416,6 +427,7 @@ public class FairyRingAtlasPlugin extends Plugin
 				sessionView = view;
 			}
 			hiddenByUs.clear();
+			movedByUs.clear();
 			travelLog.forget();
 			hits = Collections.emptyList();
 		}
@@ -614,9 +626,20 @@ public class FairyRingAtlasPlugin extends Plugin
 				hiddenByUs.add(id);
 			}
 		}
+		for (int[] m : MOVED_IN_MAP)
+		{
+			Widget w = client.getWidget(m[0]);
+			if (w == null || (w.getOriginalX() == m[1] && w.getOriginalY() == m[2]
+				&& w.getOriginalWidth() == m[3] && w.getOriginalHeight() == m[4]))
+			{
+				continue;
+			}
+			movedByUs.putIfAbsent(m[0], new int[]{w.getOriginalX(), w.getOriginalY(), w.getOriginalWidth(), w.getOriginalHeight()});
+			place(w, m[1], m[2], m[3], m[4]);
+		}
 	}
 
-	/** Un-hide only what we hid, and only if it is still hidden. */
+	/** Un-hide only what we hid, and only if it is still hidden; put back what we moved. */
 	private void restoreHides()
 	{
 		for (int id : hiddenByUs)
@@ -628,6 +651,25 @@ public class FairyRingAtlasPlugin extends Plugin
 			}
 		}
 		hiddenByUs.clear();
+		for (Map.Entry<Integer, int[]> e : movedByUs.entrySet())
+		{
+			Widget w = client.getWidget(e.getKey());
+			int[] o = e.getValue();
+			if (w != null)
+			{
+				place(w, o[0], o[1], o[2], o[3]);
+			}
+		}
+		movedByUs.clear();
+	}
+
+	private static void place(Widget w, int x, int y, int width, int height)
+	{
+		w.setOriginalX(x);
+		w.setOriginalY(y);
+		w.setOriginalWidth(width);
+		w.setOriginalHeight(height);
+		w.revalidate();
 	}
 
 	void setMode(Mode m)

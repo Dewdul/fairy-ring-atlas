@@ -60,12 +60,12 @@ public interface FairyRingAtlasConfig extends Config
 		return 720;
 	}
 
-	@ConfigItem(keyName = "startView", name = "Start view",
-		description = "Fit all rings, centre on the ring you are standing at, or remember the last view this session",
+	@ConfigItem(keyName = "openAt", name = "Open at",
+		description = "Centre the map on the ring you are standing at, fit all rings, or remember the last view this session",
 		section = mapSection, position = 3)
 	default StartView startView()
 	{
-		return StartView.FIT_ALL;
+		return StartView.AROUND_YOU;
 	}
 
 	@ConfigItem(keyName = "placeLabels", name = "Place names",

@@ -30,8 +30,10 @@ public final class Scene
 	public RingRepository repo;
 	public MapView view;
 	public final List<Rectangle> holes = new ArrayList<>();
-	/** The CONFIRM hole, for the "ready" pulse; may be null. */
+	/** The CONFIRM hole, for the "ready" pulse; null while Teleport is covered. */
 	public Rectangle confirmHole;
+	/** Where Teleport (CONFIRM) is, shown or covered; may be null. */
+	public Rectangle teleportSlot;
 
 	// --- state
 	public String selected;
@@ -90,5 +92,20 @@ public final class Scene
 	public String dialledCode()
 	{
 		return dials == null ? null : DialMath.code(dials[0], dials[1], dials[2]);
+	}
+
+	/**
+	 * Whether the real Teleport button is left uncovered. Only when pressing it goes where the
+	 * player expects: the dials show the selected ring, or, with nothing selected, a real
+	 * destination. Otherwise the map covers it, so a stale or invalid code is not used by mistake.
+	 */
+	public boolean teleportShown()
+	{
+		if (selected != null)
+		{
+			return dialsMatch(selected);
+		}
+		Ring r = repo == null ? null : repo.ring(dialledCode());
+		return r != null && r.isDialable();
 	}
 }

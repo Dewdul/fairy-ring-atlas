@@ -26,7 +26,9 @@ import java.util.List;
  */
 public class ChromePainter
 {
-	static final int BAR_H = 22;
+	/** Tall enough to hold the game's close button and Teleport, which sit at its right end. */
+	static final int BAR_H = 36;
+	private static final int BUTTON_H = 20;
 	static final int PANEL_W = 150;
 	static final int CARD_W = 340;
 	static final int CARD_MAX_H = 260;
@@ -132,7 +134,7 @@ public class ChromePainter
 		boolean flash = s.now < s.flashUntil && (s.now / 250) % 2 == 0;
 		return java.util.Objects.hash(v.getX(), v.getY(), v.getW(), v.getH(), v.getLayer(), s.selected, s.hovered,
 			java.util.Arrays.hashCode(s.dials), s.query, s.rowVisible, s.notice, s.panelCollapsed, s.panelScroll,
-			s.now < s.flashUntil, flash, hover, s.holes, s.repo.getStateHash(), s.here,
+			s.now < s.flashUntil, flash, hover, s.holes, s.teleportSlot, s.repo.getStateHash(), s.here,
 			s.visitedColor, s.selectedColor, s.favouriteColor, focusCovered(s));
 	}
 
@@ -169,6 +171,23 @@ public class ChromePainter
 				right = Math.min(right, h.x - 6);
 			}
 		}
+		Rectangle slot = s.teleportSlot;
+		if (slot != null && slot.intersects(bar))
+		{
+			right = Math.min(right, slot.x - 8);
+			if (!s.holes.contains(slot))
+			{
+				// Teleport is covered until the dials are worth using: a disabled stand-in
+				g.setColor(new Color(0x2a241b));
+				g.fillRect(slot.x, slot.y, slot.width, slot.height);
+				g.setColor(BRONZE);
+				g.drawRect(slot.x, slot.y, slot.width - 1, slot.height - 1);
+				String t = "Teleport";
+				ink.text(g, t, ink.bold, GREY, slot.x + (slot.width - ink.width(ink.bold, t)) / 2,
+					slot.y + (slot.height - ink.height(ink.bold)) / 2, Ink.Style.SHADOW);
+			}
+		}
+		int by = bar.y + (bar.height - BUTTON_H) / 2;
 		int ty = bar.y + (bar.height - ink.height(ink.small)) / 2;
 		String[] ids = {Hit.DIALS, Hit.FIT, Hit.ZOOM_IN, Hit.ZOOM_OUT, Hit.CLEAR};
 		String[] labels = {"Dials", "Fit", "+", "-", "Clear"};
@@ -181,7 +200,7 @@ public class ChromePainter
 				continue;
 			}
 			int w = Math.max(18, ink.width(ink.small, labels[i]) + 12);
-			Rectangle b = new Rectangle(right - w, bar.y + 3, w, bar.height - 6);
+			Rectangle b = new Rectangle(right - w, by, w, BUTTON_H);
 			button(g, s, b, labels[i], ids[i], options[i], targets[i]);
 			right = b.x - 3;
 		}
@@ -197,7 +216,7 @@ public class ChromePainter
 		else
 		{
 			int w = ink.width(ink.small, surface.getName()) + 20;
-			Rectangle b = new Rectangle(x, bar.y + 3, w, bar.height - 6);
+			Rectangle b = new Rectangle(x, by, w, BUTTON_H);
 			button(g, s, b, surface.getName(), Hit.BACK, "Back to", surface.getName());
 			triangle(g, b.x + 7, b.y + b.height / 2.0, 3.5, false, CREAM);
 			x = b.x + b.width + 6;
@@ -208,7 +227,10 @@ public class ChromePainter
 		x += 14;
 		if (s.dials != null && x < right - 60)
 		{
-			x = text(g, "Dials:", ink.small, GREY, x, ty, right) + 4;
+			if (right - x > 160)
+			{
+				x = text(g, "Dials:", ink.small, GREY, x, ty, right) + 4;
+			}
 			String code = s.dialledCode();
 			x = text(g, DialMath.spaced(code), ink.bold, Color.WHITE, x, ty, right) + 5;
 			Ring dialled = s.repo.ring(code);

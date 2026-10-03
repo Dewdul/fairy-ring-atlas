@@ -127,8 +127,16 @@ public class AtlasOverlay extends Overlay
 			return null;
 		}
 		List<Rectangle> holes = MapLayout.holes(client);
+		Rectangle confirm = MapLayout.bounds(client, net.runelite.api.gameval.InterfaceID.Fairyrings.CONFIRM);
+		scene.teleportSlot = confirm;
+		if (confirm != null && !scene.teleportShown())
+		{
+			// the map covers Teleport (and owns its clicks) until the dials are worth using
+			holes.remove(confirm);
+			confirm = null;
+		}
 		MapView v = plugin.frameView(rect);
-		fillScene(v, holes);
+		fillScene(v, holes, confirm);
 		chrome.layout(scene);
 
 		Layer layer = repo.layer(v.getLayer());
@@ -165,13 +173,13 @@ public class AtlasOverlay extends Overlay
 		return null;
 	}
 
-	private void fillScene(MapView v, List<Rectangle> holes)
+	private void fillScene(MapView v, List<Rectangle> holes, Rectangle confirm)
 	{
 		Scene s = scene;
 		s.view = v;
 		s.holes.clear();
 		s.holes.addAll(holes);
-		s.confirmHole = MapLayout.bounds(client, net.runelite.api.gameval.InterfaceID.Fairyrings.CONFIRM);
+		s.confirmHole = confirm;
 		s.here = plugin.getHere();
 		s.flashUntil = plugin.getFlashUntil();
 		s.notice = plugin.getNotice();

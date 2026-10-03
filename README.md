@@ -19,7 +19,7 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 
 ## How to use it
 
-1. Use a fairy ring. The map opens over the dials. The real **Teleport** and close buttons stay visible and work as normal.
+1. Use a fairy ring. The map opens over the dials, centred on the ring you are standing at. The real **Teleport** and close buttons sit at the right end of the map's top bar. Teleport is greyed out until the dials show your chosen ring, so you can't teleport somewhere else by mistake.
 2. **Click a ring** to select it. The card at the bottom then tells you the next step:
    - **The ring is in your travel log.** The log is narrowed to that code and its row is highlighted. Click the row (*Use code*), then click **Teleport**. If you click a row in the log yourself, the map follows and the log is left as it is.
    - **The ring is not in your travel log yet.** Click **Show dials**. Arrows on the real dials show which way to turn each one and how many times. Turn the dials, then click **Teleport**. The **Map** button takes you back to the map.
@@ -42,7 +42,7 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 |---|---|---|---|
 | Map | Open as map | on | Start with the map rather than the dials |
 | | Max width / Max height | 1100 / 720 | Largest map size in resizable mode |
-| | Start view | Fit all | *Fit all* rings, centre *Around you*, or *Remember* the last view this session |
+| | Open at | Around you | Centre on the ring you are standing at (*Around you*), *Fit all* rings, or *Remember* the last view this session |
 | | Place names / Map icons | on | World map place names, and icons when zoomed in |
 | | Fit to search | on | Zoom to the rings that match the travel log search |
 | Markers | Code labels | All | Show codes for *All* rings, *Favourites* only, or *None* |
