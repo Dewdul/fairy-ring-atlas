@@ -1,0 +1,1021 @@
+/*
+ * Copyright (c) 2026, Dewdul
+ * All rights reserved.
+ * Licensed under the BSD 2-Clause License. See LICENSE.
+ */
+package com.fairyringatlas;
+
+import com.google.gson.Gson;
+import com.google.inject.Provides;
+import java.awt.Insets;
+import java.awt.Rectangle;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import javax.inject.Inject;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.Menu;
+import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
+import net.runelite.api.Player;
+import net.runelite.api.Point;
+import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ClientTick;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
+import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.PostMenuSort;
+import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.events.VarClientStrChanged;
+import net.runelite.api.events.WidgetClosed;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.VarClientID;
+import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetUtil;
+import net.runelite.client.callback.ClientThread;
+import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.input.MouseManager;
+import net.runelite.client.plugins.Plugin;
+import net.runelite.client.plugins.PluginDependency;
+import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.plugins.cluescrolls.ClueScrollPlugin;
+import net.runelite.client.ui.JagexColors;
+import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.ColorUtil;
+import net.runelite.client.util.Text;
+
+@Slf4j
+@PluginDescriptor(
+	name = "Fairy Ring Atlas",
+	description = "Turns the fairy ring dials into a high-resolution, zoomable map of every destination: click a ring, then use its travel log entry or follow the dial guide",
+	tags = {"fairy", "ring", "map", "teleport", "travel", "zanaris", "code", "dial", "transport"}
+)
+@PluginDependency(ClueScrollPlugin.class)
+public class FairyRingAtlasPlugin extends Plugin
+{
+	static final String RESOURCES = "/com/fairyringatlas/";
+	private static final int SCRIPT_LOG_REBUILD = 8080;
+	private static final int SCRIPT_CONFIRM = 399;
+	private static final int SCRIPT_CONFIRM_EXPIRE = 400;
+	private static final int REOPEN_TICKS = 3;
+	private static final long ANIM_MS = 250;
+	private static final String FRM_CLASS = "com.fairyringmap.FairyRingMapPlugin";
+
+	/** Components of 398 hidden in map mode; CONFIRM, the close button, the backdrop and its ornament stay. */
+	private static final int[] HIDDEN_IN_MAP = {
+		InterfaceID.Fairyrings.ROOT_MODEL1, InterfaceID.Fairyrings.ROOT_TEXT2,
+		InterfaceID.Fairyrings.ROOT_MODEL3, InterfaceID.Fairyrings.ROOT_MODEL4, InterfaceID.Fairyrings.ROOT_MODEL5,
+		InterfaceID.Fairyrings.A, InterfaceID.Fairyrings.B, InterfaceID.Fairyrings.C, InterfaceID.Fairyrings.D,
+		InterfaceID.Fairyrings.I, InterfaceID.Fairyrings.J, InterfaceID.Fairyrings.K, InterfaceID.Fairyrings.L,
+		InterfaceID.Fairyrings.P, InterfaceID.Fairyrings.Q, InterfaceID.Fairyrings.R, InterfaceID.Fairyrings.S,
+		InterfaceID.Fairyrings.ROOT_MODEL18,
+		InterfaceID.Fairyrings._1_CLOCKWISE, InterfaceID.Fairyrings._1_ANTICLOCKWISE,
+		InterfaceID.Fairyrings._2_CLOCKWISE, InterfaceID.Fairyrings._2_ANTICLOCKWISE,
+		InterfaceID.Fairyrings._3_CLOCKWISE, InterfaceID.Fairyrings._3_ANTICLOCKWISE,
+	};
+	/** Rotate zones per dial: clockwise, anticlockwise. */
+	static final int[][] ZONES = {
+		{InterfaceID.Fairyrings._1_CLOCKWISE, InterfaceID.Fairyrings._1_ANTICLOCKWISE},
+		{InterfaceID.Fairyrings._2_CLOCKWISE, InterfaceID.Fairyrings._2_ANTICLOCKWISE},
+		{InterfaceID.Fairyrings._3_CLOCKWISE, InterfaceID.Fairyrings._3_ANTICLOCKWISE},
+	};
+
+	enum Mode
+	{
+		MAP,
+		DIAL,
+	}
+
+	@Inject
+	private Client client;
+	@Inject
+	private ClientThread clientThread;
+	@Inject
+	private FairyRingAtlasConfig config;
+	@Inject
+	private OverlayManager overlayManager;
+	@Inject
+	private MouseManager mouseManager;
+	@Inject
+	private PluginManager pluginManager;
+	@Inject
+	private Gson gson;
+	@Inject
+	private AtlasOverlay overlay;
+	@Inject
+	private AtlasInput input;
+	@Inject
+	private ClueHelper clueHelper;
+
+	@Getter
+	private RingRepository repo;
+	@Getter
+	private TileStore tiles;
+	private ExecutorService executor;
+	@Getter
+	private TravelLogController travelLog;
+
+	// --- shared with the input thread
+	@Getter
+	private volatile boolean open;
+	@Getter
+	private volatile Mode mode = Mode.MAP;
+	private volatile boolean menuOpen;
+	private final Object viewLock = new Object();
+	private volatile MapView view;
+	private MapView animFrom;
+	private MapView animTo;
+	private long animStart;
+	private volatile List<Hit> hits = Collections.emptyList();
+	private volatile List<Rectangle> holes = Collections.emptyList();
+	private volatile Rectangle panel;
+	@Getter
+	private volatile Rectangle mapButton;
+	@Getter
+	private volatile int panelScroll;
+	private volatile int panelScrollMax;
+
+	// --- client thread state
+	@Getter
+	private String selected;
+	@Getter
+	private String here;
+	@Getter
+	private String search = "";
+	@Getter
+	private long flashUntil;
+	/** The player's panel choice; null until they toggle it (then small maps start collapsed). */
+	private Boolean panelChoice;
+	private boolean panelCollapsedNow;
+	@Getter
+	private String notice;
+	@Getter
+	private WorldPoint clue;
+	private boolean needsInitialView;
+	private int playerX;
+	private int playerY;
+	private int closedTick = -100;
+	private Mode closedMode = Mode.MAP;
+	private MapView sessionView;
+	private final Map<String, MapView> layerViews = new HashMap<>();
+	private final Set<Integer> hiddenByUs = new HashSet<>();
+
+	@Provides
+	FairyRingAtlasConfig provideConfig(ConfigManager configManager)
+	{
+		return configManager.getConfig(FairyRingAtlasConfig.class);
+	}
+
+	@Override
+	protected void startUp()
+	{
+		repo = RingRepository.load(gson, RESOURCES);
+		executor = Executors.newSingleThreadExecutor(r ->
+		{
+			Thread t = new Thread(r, "fairy-ring-atlas-tiles");
+			t.setDaemon(true);
+			t.setPriority(Thread.MIN_PRIORITY);
+			return t;
+		});
+		tiles = new TileStore(repo.getIndex(), repo.getLayers(), RESOURCES, executor);
+		travelLog = new TravelLogController(client);
+		overlayManager.add(overlay);
+		mouseManager.registerMouseListener(input);
+		mouseManager.registerMouseWheelListener(input);
+		log.debug("started: rings={} index={} imagery={}", repo.isRingsLoaded(), repo.isIndexLoaded(), tiles.hasImagery());
+		clientThread.invokeLater(() ->
+		{
+			if (client.getGameState() == GameState.LOGGED_IN && isDialsVisible() && !open)
+			{
+				onDialsOpened();
+			}
+		});
+	}
+
+	@Override
+	protected void shutDown()
+	{
+		overlayManager.remove(overlay);
+		mouseManager.unregisterMouseListener(input);
+		mouseManager.unregisterMouseWheelListener(input);
+		input.reset();
+		TravelLogController logController = travelLog;
+		clientThread.invoke(() ->
+		{
+			restoreHides();
+			logController.restore();
+		});
+		open = false;
+		executor.shutdownNow();
+		tiles.close();
+		overlay.reset();
+		view = null;
+		selected = null;
+		hits = Collections.emptyList();
+	}
+
+	// ------------------------------------------------------------------ open / close
+
+	private boolean isDialsVisible()
+	{
+		Widget confirm = client.getWidget(InterfaceID.Fairyrings.CONFIRM);
+		return confirm != null && !confirm.isHidden();
+	}
+
+	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded e)
+	{
+		if (e.getGroupId() == InterfaceID.FAIRYRINGS && !open)
+		{
+			onDialsOpened();
+		}
+	}
+
+	@Subscribe
+	public void onWidgetClosed(WidgetClosed e)
+	{
+		if (e.getGroupId() == InterfaceID.FAIRYRINGS && open)
+		{
+			onDialsClosed();
+		}
+		else if (e.getGroupId() == InterfaceID.FAIRYRINGS_LOG)
+		{
+			travelLog.forget();
+		}
+	}
+
+	private void onDialsOpened()
+	{
+		int tick = client.getTickCount();
+		boolean reopen = tick - closedTick <= REOPEN_TICKS;
+		open = true;
+		mode = reopen ? closedMode : config.openInMapMode() ? Mode.MAP : Mode.DIAL;
+		if (!reopen)
+		{
+			selected = null;
+			panelScroll = 0;
+			needsInitialView = true;
+		}
+		repo.readDbTable(client);
+		repo.refreshState(client);
+		search = currentSearch();
+		locatePlayer();
+		notice = fairyRingMapEnabled() ? "Fairy Ring Map is also enabled - disable one of them" : null;
+		clue = null;
+		if (config.clueHelper())
+		{
+			clue = clueHelper.location();
+			String code = clueHelper.fairyRingCode();
+			if (code != null && repo.ring(code) != null && !reopen)
+			{
+				selected = code;
+			}
+		}
+		if (mode == Mode.MAP)
+		{
+			applyHides();
+		}
+	}
+
+	private void onDialsClosed()
+	{
+		open = false;
+		closedTick = client.getTickCount();
+		closedMode = mode;
+		MapView v = view;
+		if (v != null)
+		{
+			sessionView = v;
+		}
+		synchronized (viewLock)
+		{
+			animTo = null;
+		}
+		input.reset();
+		restoreHides();
+		travelLog.restore();
+		hits = Collections.emptyList();
+	}
+
+	private void locatePlayer()
+	{
+		here = null;
+		Player p = client.getLocalPlayer();
+		if (p == null)
+		{
+			return;
+		}
+		WorldPoint wp = p.getWorldLocation();
+		playerX = wp.getX();
+		playerY = wp.getY();
+		int best = Integer.MAX_VALUE;
+		for (Ring r : repo.dialable())
+		{
+			int d = Math.max(Math.abs(r.getX() - wp.getX()), Math.abs(r.getY() - wp.getY()));
+			if (r.isMapped() && r.getPlane() == wp.getPlane() && d <= 4 && d < best)
+			{
+				best = d;
+				here = r.getCode();
+			}
+		}
+	}
+
+	private boolean fairyRingMapEnabled()
+	{
+		try
+		{
+			for (Plugin p : pluginManager.getPlugins())
+			{
+				if (FRM_CLASS.equals(p.getClass().getName()) && pluginManager.isPluginEnabled(p))
+				{
+					return true;
+				}
+			}
+		}
+		catch (RuntimeException e)
+		{
+			log.debug("plugin scan failed", e);
+		}
+		return false;
+	}
+
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged e)
+	{
+		if (e.getGameState() != GameState.LOGGED_IN && open)
+		{
+			open = false;
+			hiddenByUs.clear();
+			travelLog.forget();
+			hits = Collections.emptyList();
+		}
+	}
+
+	@Subscribe
+	public void onClientTick(ClientTick e)
+	{
+		menuOpen = client.isMenuOpen();
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick e)
+	{
+		boolean visible = isDialsVisible();
+		if (open && !visible)
+		{
+			onDialsClosed();
+		}
+		else if (!open && visible)
+		{
+			onDialsOpened();
+		}
+		if (!open)
+		{
+			return;
+		}
+		repo.refreshState(client);
+		if (mode == Mode.MAP)
+		{
+			applyHides();
+		}
+		if (config.clueHelper())
+		{
+			clue = clueHelper.location();
+		}
+	}
+
+	@Subscribe
+	public void onScriptPostFired(ScriptPostFired e)
+	{
+		if (!open)
+		{
+			return;
+		}
+		switch (e.getScriptId())
+		{
+			case SCRIPT_LOG_REBUILD:
+				travelLog.forget();
+				applyLogFilter();
+				break;
+			case SCRIPT_CONFIRM:
+				// the game hid the rotate zones itself; they are no longer ours to restore
+				for (int[] zone : ZONES)
+				{
+					hiddenByUs.remove(zone[0]);
+					hiddenByUs.remove(zone[1]);
+				}
+				break;
+			case SCRIPT_CONFIRM_EXPIRE:
+				if (mode == Mode.MAP)
+				{
+					applyHides();
+				}
+				break;
+			default:
+				break;
+		}
+	}
+
+	@Subscribe
+	public void onVarClientStrChanged(VarClientStrChanged e)
+	{
+		if (e.getIndex() != VarClientID.FAIRYRINGS_SEARCHSTRING || !open)
+		{
+			return;
+		}
+		String q = currentSearch();
+		if (q.equals(search))
+		{
+			return;
+		}
+		search = q;
+		if (q.isEmpty())
+		{
+			applyLogFilter();
+			return;
+		}
+		travelLog.restore();
+		MapView v = view;
+		if (v == null)
+		{
+			return;
+		}
+		List<Ring> onLayer = new ArrayList<>();
+		boolean elsewhere = false;
+		for (Ring r : repo.matching(q))
+		{
+			if (v.getLayer().equals(r.getLayer()))
+			{
+				onLayer.add(r);
+			}
+			else
+			{
+				elsewhere = true;
+			}
+		}
+		if (onLayer.isEmpty() && elsewhere)
+		{
+			flashUntil = System.currentTimeMillis() + 1600;
+		}
+		if (!onLayer.isEmpty() && config.autoFitSearch())
+		{
+			animateTo(fitRings(v, onLayer, 2, insets(v.rect())));
+		}
+	}
+
+	private String currentSearch()
+	{
+		String s = client.getVarcStrValue(VarClientID.FAIRYRINGS_SEARCHSTRING);
+		return s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
+	}
+
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked e)
+	{
+		if (!open || !"Use code".equals(e.getMenuOption())
+			|| WidgetUtil.componentToInterface(e.getParam1()) != InterfaceID.FAIRYRINGS_LOG)
+		{
+			return;
+		}
+		String code = DialMath.normalize(Text.removeTags(e.getMenuTarget()));
+		Ring r = repo.ring(code);
+		if (r != null)
+		{
+			boolean changed = !code.equals(selected);
+			selected = code;
+			panTo(r);
+			if (changed)
+			{
+				applyLogFilter();
+			}
+		}
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged e)
+	{
+		if (FairyRingAtlasConfig.GROUP.equals(e.getGroup()))
+		{
+			clientThread.invoke(() ->
+			{
+				if (open)
+				{
+					applyLogFilter();
+				}
+			});
+		}
+	}
+
+	// ------------------------------------------------------------------ widget hiding
+
+	private void applyHides()
+	{
+		for (int id : HIDDEN_IN_MAP)
+		{
+			Widget w = client.getWidget(id);
+			if (w != null && !w.isSelfHidden())
+			{
+				w.setHidden(true);
+				hiddenByUs.add(id);
+			}
+		}
+	}
+
+	/** Un-hide only what we hid, and only if it is still hidden. */
+	private void restoreHides()
+	{
+		for (int id : hiddenByUs)
+		{
+			Widget w = client.getWidget(id);
+			if (w != null && w.isSelfHidden())
+			{
+				w.setHidden(false);
+			}
+		}
+		hiddenByUs.clear();
+	}
+
+	void setMode(Mode m)
+	{
+		mode = m;
+		input.reset();
+		if (m == Mode.MAP)
+		{
+			applyHides();
+		}
+		else
+		{
+			restoreHides();
+			hits = Collections.emptyList();
+		}
+	}
+
+	// ------------------------------------------------------------------ selection
+
+	void select(String code, boolean pan)
+	{
+		Ring r = repo.ring(code);
+		if (r == null)
+		{
+			return;
+		}
+		selected = code;
+		if (pan)
+		{
+			panTo(r);
+		}
+		applyLogFilter();
+	}
+
+	void clearSelection()
+	{
+		selected = null;
+		travelLog.restore();
+	}
+
+	/** Filter the travel log to the selection when allowed; otherwise leave it as the game drew it. */
+	private void applyLogFilter()
+	{
+		Ring r = repo.ring(selected);
+		// read the search live: the log rebuild can run before the varc change is announced
+		if (!config.filterTravelLog() || r == null || !currentSearch().isEmpty() || !repo.hasLogRow(r.getCode())
+			|| !travelLog.apply(r, repo.favouriteSlot(r.getCode()), repo.getLogComponents(), config.selectedColor().getRGB() & 0xFFFFFF))
+		{
+			travelLog.restore();
+		}
+	}
+
+	int[] dials()
+	{
+		return new int[]{
+			client.getVarbitValue(VarbitID.FAIRYRING_1),
+			client.getVarbitValue(VarbitID.FAIRYRING_2),
+			client.getVarbitValue(VarbitID.FAIRYRING_3),
+		};
+	}
+
+	// ------------------------------------------------------------------ view (input thread safe)
+
+	MapView getView()
+	{
+		return view;
+	}
+
+	/** Called by the overlay each frame: lays the view onto the live map rectangle and steps the animation. */
+	MapView frameView(Rectangle rect)
+	{
+		synchronized (viewLock)
+		{
+			if (view == null || needsInitialView)
+			{
+				view = initialView(rect);
+				needsInitialView = false;
+				Ring sel = repo.ring(selected);
+				if (sel != null && sel.isMapped() && !view.getLayer().equals(sel.getLayer()))
+				{
+					Layer l = repo.layer(sel.getLayer());
+					view = l == null ? view : fitLayer(l, rect, insets(rect));
+				}
+			}
+			if (animTo != null)
+			{
+				double t = (System.currentTimeMillis() - animStart) / (double) ANIM_MS;
+				view = MapView.interpolate(animFrom, animTo, MapView.easeOut(t)).withRect(rect);
+				if (t >= 1)
+				{
+					animTo = null;
+				}
+			}
+			else
+			{
+				view = view.withRect(rect);
+			}
+			return view;
+		}
+	}
+
+	private MapView initialView(Rectangle rect)
+	{
+		Layer surface = repo.surface();
+		Ring hereRing = repo.ring(here);
+		if (hereRing != null && hereRing.isMapped() && !Layer.SURFACE.equals(hereRing.getLayer()))
+		{
+			Layer l = repo.layer(hereRing.getLayer());
+			if (l != null)
+			{
+				return fitLayer(l, rect, insets(rect));
+			}
+		}
+		Insets in = insets(rect);
+		MapView base = MapView.of(surface, rect);
+		switch (config.startView())
+		{
+			case REMEMBER:
+				Layer l = sessionView == null ? null : repo.layer(sessionView.getLayer());
+				if (l != null)
+				{
+					return sessionView.withRect(rect).withLayer(l);
+				}
+				break;
+			case AROUND_YOU:
+				if (hereRing != null)
+				{
+					return base.focusOn(hereRing.getX() + 0.5, hereRing.getY() + 0.5, 2, in);
+				}
+				if (surface.contains(playerX, playerY))
+				{
+					return base.focusOn(playerX + 0.5, playerY + 0.5, 2, in);
+				}
+				break;
+			default:
+				break;
+		}
+		return fitRings(base, repo.ringsIn(Layer.SURFACE), 0, in);
+	}
+
+	/** Screen space the chrome takes from the map: the top bar (and notice line) and the Elsewhere panel. */
+	static Insets chromeInsets(boolean panelCollapsed, boolean notice)
+	{
+		return new Insets(ChromePainter.BAR_H + (notice ? 18 : 0), 6 + (panelCollapsed ? 20 : ChromePainter.PANEL_W), 0, 0);
+	}
+
+	private Insets insets(Rectangle rect)
+	{
+		return chromeInsets(isPanelCollapsed(rect.width), notice != null);
+	}
+
+	/** A layer's view fitted to its bounds, clear of the chrome. */
+	static MapView fitLayer(Layer l, Rectangle rect, Insets in)
+	{
+		MapView v = MapView.of(l, rect);
+		return v.fit(v.getBx0(), v.getBy0(), v.getBx1(), v.getBy1(), 12, in);
+	}
+
+	/** A view fitting the given rings (or the layer bounds when none), zoomed in no further than maxPpt when set. */
+	static MapView fitRings(MapView v, List<Ring> rings, double maxPpt, Insets in)
+	{
+		if (rings.isEmpty())
+		{
+			return v.fit(v.getBx0(), v.getBy0(), v.getBx1(), v.getBy1(), 12, in);
+		}
+		int x0 = Integer.MAX_VALUE;
+		int y0 = Integer.MAX_VALUE;
+		int x1 = Integer.MIN_VALUE;
+		int y1 = Integer.MIN_VALUE;
+		for (Ring r : rings)
+		{
+			x0 = Math.min(x0, r.getX());
+			y0 = Math.min(y0, r.getY());
+			x1 = Math.max(x1, r.getX() + 1);
+			y1 = Math.max(y1, r.getY() + 1);
+		}
+		MapView f = v.fit(x0, y0, x1, y1, 40, in);
+		if (maxPpt > 0 && f.getPpt() > maxPpt)
+		{
+			f = f.focusOn((x0 + x1) / 2.0, (y0 + y1) / 2.0, maxPpt, in);
+		}
+		return f;
+	}
+
+	void setView(MapView v)
+	{
+		synchronized (viewLock)
+		{
+			animTo = null;
+			view = v;
+		}
+	}
+
+	void animateTo(MapView target)
+	{
+		synchronized (viewLock)
+		{
+			if (view == null)
+			{
+				view = target;
+				return;
+			}
+			animFrom = view;
+			animTo = target.withRect(view.rect());
+			animStart = System.currentTimeMillis();
+		}
+	}
+
+	/** Input thread: zoom about the cursor. */
+	void zoomAt(int x, int y, double factor)
+	{
+		synchronized (viewLock)
+		{
+			if (view != null)
+			{
+				animTo = null;
+				view = view.zoomAbout(x, y, factor);
+			}
+		}
+	}
+
+	/** Input thread: drag the map. */
+	void panBy(int dx, int dy)
+	{
+		synchronized (viewLock)
+		{
+			if (view != null)
+			{
+				animTo = null;
+				view = view.panBy(dx, dy);
+			}
+		}
+	}
+
+	/** Input thread: scroll the Elsewhere panel. */
+	void scrollPanel(int dy)
+	{
+		panelScroll = Math.max(0, Math.min(panelScrollMax, panelScroll + dy));
+	}
+
+	void zoomCentre(double factor)
+	{
+		MapView v = view;
+		if (v != null)
+		{
+			animateTo(v.zoomAbout(v.getX() + v.getW() / 2.0, v.getY() + v.getH() / 2.0, factor));
+		}
+	}
+
+	void panTo(Ring r)
+	{
+		if (r == null || !r.isMapped() || view == null)
+		{
+			return;
+		}
+		openLayer(r.getLayer());
+		MapView v = view;
+		animateTo(v.focusOn(r.getX() + 0.5, r.getY() + 0.5, v.getPpt(), insets(v.rect())));
+	}
+
+	void zoomTo(Ring r)
+	{
+		if (r == null || !r.isMapped() || view == null)
+		{
+			return;
+		}
+		openLayer(r.getLayer());
+		MapView v = view;
+		animateTo(v.focusOn(r.getX() + 0.5, r.getY() + 0.5, Math.max(v.getPpt() * 2, 4), insets(v.rect())));
+	}
+
+	void fit()
+	{
+		MapView v = view;
+		if (v != null)
+		{
+			Insets in = insets(v.rect());
+			animateTo(Layer.SURFACE.equals(v.getLayer()) ? fitRings(v, repo.ringsIn(Layer.SURFACE), 0, in)
+				: v.fit(v.getBx0(), v.getBy0(), v.getBx1(), v.getBy1(), 12, in));
+		}
+	}
+
+	/** Switch to a layer: the surface comes back where it was left, other layers open fitted. */
+	void openLayer(String id)
+	{
+		Layer l = repo.layer(id);
+		MapView v = view;
+		if (l == null || v == null || l.getId().equals(v.getLayer()))
+		{
+			return;
+		}
+		layerViews.put(v.getLayer(), v);
+		MapView saved = Layer.SURFACE.equals(id) ? layerViews.get(id) : null;
+		setView(saved != null ? saved.withRect(v.rect()) : fitLayer(l, v.rect(), insets(v.rect())));
+	}
+
+	// ------------------------------------------------------------------ hit testing (input thread safe)
+
+	void publish(List<Hit> newHits, List<Rectangle> newHoles, Rectangle newPanel, int newPanelScrollMax, Rectangle newMapButton)
+	{
+		hits = newHits;
+		holes = newHoles;
+		panel = newPanel;
+		panelScrollMax = newPanelScrollMax;
+		mapButton = newMapButton;
+		if (panelScroll > newPanelScrollMax)
+		{
+			panelScroll = newPanelScrollMax;
+		}
+	}
+
+	Hit hitAt(int x, int y)
+	{
+		return Hit.at(hits, x, y);
+	}
+
+	boolean inPanel(int x, int y)
+	{
+		Rectangle p = panel;
+		return p != null && p.contains(x, y);
+	}
+
+	boolean inHole(int x, int y)
+	{
+		for (Rectangle h : holes)
+		{
+			if (h.contains(x, y))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Whether the Elsewhere panel is collapsed for a map of this width. */
+	boolean isPanelCollapsed(int mapWidth)
+	{
+		panelCollapsedNow = panelChoice != null ? panelChoice : mapWidth < 700;
+		return panelCollapsedNow;
+	}
+
+	/** Whether the map owns input at this point: dials open, map mode, no menu, inside, not in a hole. */
+	boolean isMapInput(int x, int y)
+	{
+		MapView v = view;
+		return open && mode == Mode.MAP && !menuOpen && v != null && v.contains(x, y) && !inHole(x, y);
+	}
+
+	// ------------------------------------------------------------------ menu ownership
+
+	@Subscribe
+	public void onPostMenuSort(PostMenuSort e)
+	{
+		if (!open || client.isMenuOpen())
+		{
+			return;
+		}
+		Point mp = client.getMouseCanvasPosition();
+		int x = mp.getX();
+		int y = mp.getY();
+		if (mode == Mode.DIAL)
+		{
+			Rectangle b = mapButton;
+			if (b != null && b.contains(x, y))
+			{
+				add(stripMenu(), "Show", "Map", m -> setMode(Mode.MAP));
+			}
+			return;
+		}
+		MapView v = view;
+		if (v == null || !v.contains(x, y) || inHole(x, y))
+		{
+			return;
+		}
+		Menu menu = stripMenu();
+		Hit hit = hitAt(x, y);
+		boolean clear = selected != null;
+		if (hit == null || !hit.isActionable())
+		{
+			if (clear)
+			{
+				add(menu, "Clear selection", "", m -> clearSelection());
+			}
+			return;
+		}
+		switch (hit.getKind())
+		{
+			case MARKER:
+			case CHIP:
+				Ring r = hit.getRing();
+				if (clear)
+				{
+					add(menu, "Clear selection", "", m -> clearSelection());
+				}
+				if (r.isMapped())
+				{
+					add(menu, "Zoom to", hit.getTarget(), m -> zoomTo(r));
+				}
+				if (r.isDialable())
+				{
+					add(menu, "Select", hit.getTarget(), m -> select(r.getCode(), hit.getKind() == Hit.Kind.CHIP));
+				}
+				break;
+			case CARD:
+			case PORTAL:
+				add(menu, hit.getOption(), hit.getTarget(), m -> openLayer(hit.getId()));
+				break;
+			case BUTTON:
+				add(menu, hit.getOption(), hit.getTarget(), m -> button(hit.getId()));
+				break;
+			default:
+				break;
+		}
+	}
+
+	/** Leaves only Cancel: no Walk here, no hidden rotate zones, no examine under the map. */
+	private Menu stripMenu()
+	{
+		Menu menu = client.getMenu();
+		List<MenuEntry> keep = new ArrayList<>();
+		for (MenuEntry m : menu.getMenuEntries())
+		{
+			if (m.getType() == MenuAction.CANCEL)
+			{
+				keep.add(m);
+			}
+		}
+		menu.setMenuEntries(keep.toArray(new MenuEntry[0]));
+		return menu;
+	}
+
+	private static void add(Menu menu, String option, String target, Consumer<MenuEntry> onClick)
+	{
+		menu.createMenuEntry(-1)
+			.setOption(option)
+			.setTarget(target == null || target.isEmpty() ? "" : ColorUtil.wrapWithColorTag(target, JagexColors.MENU_TARGET))
+			.setType(MenuAction.RUNELITE)
+			.onClick(onClick);
+	}
+
+	private void button(String id)
+	{
+		switch (id)
+		{
+			case Hit.ZOOM_IN:
+				zoomCentre(1.5);
+				break;
+			case Hit.ZOOM_OUT:
+				zoomCentre(1 / 1.5);
+				break;
+			case Hit.FIT:
+				fit();
+				break;
+			case Hit.DIALS:
+				setMode(Mode.DIAL);
+				break;
+			case Hit.CLEAR:
+				clearSelection();
+				break;
+			case Hit.BACK:
+				openLayer(Layer.SURFACE);
+				break;
+			case Hit.TOGGLE_PANEL:
+				panelChoice = !panelCollapsedNow;
+				break;
+			default:
+				break;
+		}
+	}
+}

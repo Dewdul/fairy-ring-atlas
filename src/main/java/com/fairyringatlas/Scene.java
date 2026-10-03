@@ -1,0 +1,94 @@
+/*
+ * Copyright (c) 2026, Dewdul
+ * All rights reserved.
+ * Licensed under the BSD 2-Clause License. See LICENSE.
+ */
+package com.fairyringatlas;
+
+import java.awt.Color;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.IntFunction;
+
+/**
+ * Everything the painter needs for one frame, as plain data so the map can be drawn without a
+ * game client (previews and tests). The overlay refills one instance every frame.
+ */
+public final class Scene
+{
+	public enum CodeLabels
+	{
+		ALL,
+		FAVOURITES,
+		NONE,
+	}
+
+	// --- data
+	public RingRepository repo;
+	public MapView view;
+	public final List<Rectangle> holes = new ArrayList<>();
+	/** The CONFIRM hole, for the "ready" pulse; may be null. */
+	public Rectangle confirmHole;
+
+	// --- state
+	public String selected;
+	/** Ring under the mouse (any entry, not only dialable ones). */
+	public Ring hovered;
+	/** Nearest ring when the interface opened, or null. */
+	public String here;
+	/** Current dial values, or null when unknown. */
+	public int[] dials;
+	/** Native travel-log search text, lower case; empty when none. */
+	public String query = "";
+	/** Whether the selected ring's log row is on screen (drives the next-step line). */
+	public boolean rowVisible;
+	/** Layers whose cards flash because they match the search; may be empty. */
+	public long flashUntil;
+	public String notice;
+	public boolean panelCollapsed;
+	public int panelScroll;
+	public double clueX = Double.NaN;
+	public double clueY = Double.NaN;
+	public Point mouse;
+	public long now;
+
+	// --- settings
+	public CodeLabels codeLabels = CodeLabels.ALL;
+	public boolean placeLabels = true;
+	public boolean mapIcons = true;
+	public boolean dimUnvisited;
+	public Color visitedColor = new Color(0x3FD9C8);
+	public Color selectedColor = new Color(0xFF981F);
+	public Color favouriteColor = new Color(0xFFD700);
+	/** Sprite lookup for map icons; returns null until a sprite is loaded. */
+	public IntFunction<BufferedImage> sprites = id -> null;
+
+	// --- output
+	public final List<Hit> hits = new ArrayList<>();
+	public Rectangle card;
+	public Rectangle panel;
+	public Rectangle topBar;
+
+	public boolean searching()
+	{
+		return query != null && !query.isEmpty();
+	}
+
+	public boolean dialsMatch(String code)
+	{
+		if (dials == null || code == null || !DialMath.isCode(code))
+		{
+			return false;
+		}
+		int[] v = DialMath.values(code);
+		return v[0] == dials[0] && v[1] == dials[1] && v[2] == dials[2];
+	}
+
+	public String dialledCode()
+	{
+		return dials == null ? null : DialMath.code(dials[0], dials[1], dials[2]);
+	}
+}

@@ -1,0 +1,306 @@
+/*
+ * Copyright (c) 2026, Dewdul
+ * All rights reserved.
+ * Licensed under the BSD 2-Clause License. See LICENSE.
+ */
+package com.fairyringatlas;
+
+import com.google.gson.Gson;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import org.junit.Test;
+
+/**
+ * The bundled data (rings.json, map/index.json, the tiles and the hub's image and size limits) and
+ * the repository against small fixtures.
+ */
+public class RingDataTest
+{
+	private static final String REAL = FairyRingAtlasPlugin.RESOURCES;
+	private static final String FIXTURES = "/fixtures/";
+	private static final Set<String> LAYER_IDS = new HashSet<>(Arrays.asList("surface", "zanaris", "abyss",
+		"dorgesh_south", "fisher_realm", "enchanted_valley", "mor_ul_rek", "cosmic_plane", "gorak_plane", "yubiusk",
+		"grimstone", "hollows", "poh"));
+
+	/** Hub limits: the bot rejects an image whose decoded size (w*h*4) is about 1 MiB or more. */
+	private static final long MAX_DECODED = 950_000;
+	private static final long MAX_RESOURCES = 6_815_744; // 6.5 MiB, DESIGN section 1
+	private static final File RESOURCE_DIR = new File("src/main/resources");
+
+	private static RingRepository real()
+	{
+		assertNotNull("rings.json missing", RingDataTest.class.getResource(REAL + "rings.json"));
+		assertNotNull("map/index.json missing", RingDataTest.class.getResource(REAL + "map/index.json"));
+		RingRepository repo = RingRepository.load(new Gson(), REAL);
+		assertTrue(repo.isRingsLoaded());
+		assertTrue(repo.isIndexLoaded());
+		return repo;
+	}
+
+	@Test
+	public void realCodesAreUniqueAndValid()
+	{
+		RingRepository repo = real();
+		Set<String> codes = new HashSet<>();
+		for (Ring r : repo.getRings())
+		{
+			assertTrue(r.getKind(), Arrays.asList("destination", "sequence", "exit").contains(r.getKind()));
+			if (Ring.KIND_DESTINATION.equals(r.getKind()))
+			{
+				assertTrue("bad code " + r.getCode(), DialMath.isCode(r.getCode()));
+				assertTrue("duplicate " + r.getCode(), codes.add(r.getCode()));
+				assertNotNull(r.getName());
+			}
+		}
+		assertTrue("expected the full ring list, got " + codes.size(), codes.size() >= 50);
+		assertNotNull(repo.ring("AIQ"));
+		assertNotNull(repo.ring("DIQ"));
+	}
+
+	@Test
+	public void realRingsLieInTheirLayers()
+	{
+		RingRepository repo = real();
+		for (Ring r : repo.getRings())
+		{
+			assertTrue(r.getCode() + " layer " + r.getLayer(), LAYER_IDS.contains(r.getLayer()));
+			if (Layer.POH.equals(r.getLayer()))
+			{
+				assertFalse(r.isMapped());
+				continue;
+			}
+			Layer l = null;
+			for (Layer il : repo.getIndex().getLayers())
+			{
+				l = r.getLayer().equals(il.getId()) ? il : l;
+			}
+			assertNotNull("index.json has no layer " + r.getLayer(), l);
+			assertTrue(r.getCode() + " " + r.getName() + " outside " + l.getId(), l.contains(r.getX() + 0.5, r.getY() + 0.5));
+		}
+		for (Portal p : repo.getPortals())
+		{
+			assertNotNull("portal to unknown layer " + p.getLayer(), repo.layer(p.getLayer()));
+			assertTrue("portal not on the surface", repo.surface().contains(p.getX(), p.getY()));
+		}
+	}
+
+	@Test
+	public void realIndexIsConsistent()
+	{
+		RingRepository repo = real();
+		MapIndex index = repo.getIndex();
+		assertEquals(256, index.getTileSize());
+		assertTrue(index.getLevels().contains(2));
+		for (Layer l : index.getLayers())
+		{
+			assertTrue("unknown layer id " + l.getId(), LAYER_IDS.contains(l.getId()));
+			assertTrue(l.isValid());
+		}
+		assertNotNull(repo.layer(Layer.SURFACE));
+		int count = 0;
+		for (Map.Entry<String, List<String>> e : index.getTiles().entrySet())
+		{
+			assertTrue("tiles for a level not listed: " + e.getKey(), index.getLevels().contains(Integer.valueOf(e.getKey())));
+			for (String t : e.getValue())
+			{
+				String path = REAL + "map/" + e.getKey() + "/" + t + ".png";
+				assertNotNull("missing " + path, RingDataTest.class.getResource(path));
+				count++;
+			}
+		}
+		assertTrue(count > 0);
+		for (MapIndex.Label label : index.getLabels())
+		{
+			assertNotNull(label.getT());
+			assertTrue(label.getS() >= 0 && label.getS() <= 2);
+		}
+	}
+
+	@Test
+	public void realTilesMatchTheIndexExactly()
+	{
+		MapIndex index = real().getIndex();
+		File map = new File(RESOURCE_DIR, REAL.substring(1) + "map");
+		assertTrue("no map directory at " + map.getAbsolutePath(), map.isDirectory());
+		Set<String> listed = new HashSet<>();
+		for (Map.Entry<String, List<String>> e : index.getTiles().entrySet())
+		{
+			for (String t : e.getValue())
+			{
+				assertTrue("listed twice: " + e.getKey() + "/" + t, listed.add(e.getKey() + "/" + t + ".png"));
+			}
+		}
+		Set<String> onDisk = new HashSet<>();
+		File[] levels = map.listFiles(File::isDirectory);
+		assertNotNull(levels);
+		for (File level : levels)
+		{
+			File[] pngs = level.listFiles((d, n) -> n.endsWith(".png"));
+			assertNotNull(pngs);
+			for (File png : pngs)
+			{
+				onDisk.add(level.getName() + "/" + png.getName());
+			}
+		}
+		Set<String> unlisted = new HashSet<>(onDisk);
+		unlisted.removeAll(listed);
+		assertTrue("tiles shipped but not in index.json: " + unlisted, unlisted.isEmpty());
+		Set<String> missing = new HashSet<>(listed);
+		missing.removeAll(onDisk);
+		assertTrue("tiles in index.json but missing: " + missing, missing.isEmpty());
+	}
+
+	@Test
+	public void everyBundledImageIsWithinHubLimits() throws IOException
+	{
+		List<File> images = new ArrayList<>();
+		collect(RESOURCE_DIR, images);
+		assertTrue(images.size() > 1000);
+		long total = 0;
+		for (File f : images)
+		{
+			try (ImageInputStream in = ImageIO.createImageInputStream(f))
+			{
+				Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
+				assertTrue("not an image: " + f, readers.hasNext());
+				ImageReader reader = readers.next();
+				reader.setInput(in);
+				int w = reader.getWidth(0);
+				int h = reader.getHeight(0);
+				reader.dispose();
+				assertTrue(f + " is " + w + "x" + h, w <= 256 && h <= 256);
+				assertTrue(f + " decodes to " + (long) w * h * 4 + " bytes", (long) w * h * 4 < MAX_DECODED);
+			}
+			total += f.length();
+		}
+		assertTrue("bundled images total " + total, total > 0);
+	}
+
+	@Test
+	public void resourcesFitTheBudget()
+	{
+		long total = size(RESOURCE_DIR);
+		assertTrue("src/main/resources is " + total + " bytes, budget " + MAX_RESOURCES, total <= MAX_RESOURCES);
+	}
+
+	private static void collect(File dir, List<File> out)
+	{
+		File[] kids = dir.listFiles();
+		if (kids == null)
+		{
+			return;
+		}
+		for (File f : kids)
+		{
+			String n = f.getName().toLowerCase();
+			if (f.isDirectory())
+			{
+				collect(f, out);
+			}
+			else if (n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".gif") || n.endsWith(".bmp"))
+			{
+				out.add(f);
+			}
+		}
+	}
+
+	private static long size(File f)
+	{
+		if (f.isFile())
+		{
+			return f.length();
+		}
+		long n = 0;
+		File[] kids = f.listFiles();
+		if (kids != null)
+		{
+			for (File k : kids)
+			{
+				n += size(k);
+			}
+		}
+		return n;
+	}
+
+	@Test
+	public void fixtureLoads()
+	{
+		RingRepository repo = RingRepository.load(new Gson(), FIXTURES);
+		assertTrue(repo.isRingsLoaded());
+		assertTrue(repo.isIndexLoaded());
+		assertEquals(4, repo.getRings().size());
+		assertEquals(3, repo.dialable().size());
+		assertEquals("Test Land", repo.surface().getName());
+		// layers missing from the index fall back to the defaults
+		assertNotNull(repo.layer("zanaris"));
+		assertEquals("surface", repo.layerAt(2600, 3230).getId());
+		assertEquals("hollows", repo.layerAt(2600, 9630).getId());
+		assertNull(repo.layerAt(10, 10));
+		assertEquals(1, repo.getPortals().size());
+		assertEquals(Arrays.asList("Members only"), repo.getGlobalRequirements());
+		assertEquals(2, repo.mappedIn("surface").size());
+		assertEquals(1, repo.ringsIn("surface").size());
+		assertFalse(repo.ring("DIQ").isMapped());
+		assertNull(repo.ring("AIP"));
+		assertEquals(2, repo.getIndex().getLabels().get(1).getLines().length);
+	}
+
+	@Test
+	public void missingResourcesStillWork()
+	{
+		RingRepository repo = RingRepository.load(new Gson(), "/nowhere/");
+		assertFalse(repo.isRingsLoaded());
+		assertFalse(repo.isIndexLoaded());
+		assertTrue(repo.getRings().isEmpty());
+		assertNotNull(repo.surface());
+		assertEquals(12, repo.getLayers().size());
+		TileStore tiles = new TileStore(repo.getIndex(), repo.getLayers(), "/nowhere/", Runnable::run);
+		assertFalse(tiles.hasImagery());
+	}
+
+	@Test
+	public void searchMatching()
+	{
+		RingRepository repo = RingRepository.load(new Gson(), FIXTURES);
+		Ring aiq = repo.ring("AIQ");
+		assertTrue(aiq.matches("aiq"));
+		assertTrue(aiq.matches("a i q"));
+		assertTrue(aiq.matches("MUDSKIP"));
+		assertTrue(aiq.matches("sarim"));
+		assertTrue(aiq.matches("skippy"));
+		assertTrue(aiq.matches("asgarnia"));
+		assertFalse(aiq.matches("zanaris"));
+		assertEquals(1, repo.matching("myreque").size());
+		assertTrue(repo.matching("").isEmpty());
+	}
+
+	@Test
+	public void state()
+	{
+		RingRepository repo = RingRepository.load(new Gson(), FIXTURES);
+		Map<String, Integer> faves = new java.util.HashMap<>();
+		faves.put("DLS", 4);
+		repo.setState(new HashSet<>(Arrays.asList("AIQ")), faves, "AIQ");
+		assertTrue(repo.isVisited("AIQ"));
+		assertFalse(repo.isVisited("DLS"));
+		assertTrue(repo.hasLogRow("DLS"));
+		assertEquals(4, repo.favouriteSlot("DLS"));
+		assertEquals(-1, repo.favouriteSlot("AIQ"));
+		assertEquals("AIQ", repo.getLastCode());
+	}
+}
