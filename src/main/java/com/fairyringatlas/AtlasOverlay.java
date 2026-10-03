@@ -280,7 +280,9 @@ public class AtlasOverlay extends Overlay
 		g.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g.draw(curve);
 		g.setColor(AtlasPainter.withAlpha(c, 230));
-		g.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10, new float[]{6f, 4f}, (float) (System.currentTimeMillis() % 1000) / -100f));
+		// the dashes march toward the row; a dash phase must not be negative, so it counts
+		// down through one dash period (6 + 4)
+		g.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10, new float[]{6f, 4f}, 10f - (System.currentTimeMillis() % 1000) / 100f));
 		g.draw(curve);
 		double ang = Math.atan2(ey - my, ex - mx);
 		Path2D head = new Path2D.Double();
