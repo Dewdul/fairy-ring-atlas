@@ -99,8 +99,9 @@ needed at the current size.
      open-sea tiles (the most common single-colour surface tile).
      Off-surface: `#000000` (empty map squares render black, `TYPE_INT_RGB`).
    - **Solid tiles** are not shipped. A solid tile whose colour differs from its
-     layer background is recorded in `index.json` `solid`. (Today every solid
-     tile equals the background: most of the Sailing-era ocean is textured.)
+     layer background is recorded in `index.json` `solid`. (Today only two
+     are: surface regions 17_55 and 17_56, `#536998`; every other solid tile
+     equals the background, as most of the Sailing-era ocean is textured.)
    - **z=-1**: for every 512x512-tile block touching a layer, a 2048x2048 mosaic
      of the (unquantised, masked) z=2 renders, with missing regions filled with
      the layer background, box-filtered 8:1 (`Image.reduce(8)`).
