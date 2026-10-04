@@ -20,9 +20,9 @@ import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.Text;
 
 /**
- * Puts destination names in a fairy ring's own right-click menu: "Last-destination (AJR)" and
- * the codes in its Favourites submenu get the ring's name as their target, so "CIR Fairy ring"
- * reads "CIR Mount Karuulm". It only relabels entries the game made; it never adds, removes or
+ * Puts destination names in a fairy ring's own right-click menu: "Last-destination (AJR) Fairy
+ * ring" reads "Last: AJR Fremennik Slayer Dungeon", and the codes in its Favourites submenu get
+ * the ring's name as their target, so "CIR Fairy ring" reads "CIR Mount Karuulm". It only relabels entries the game made; it never adds, removes or
  * reorders one. An entry another plugin has already renamed is left alone.
  *
  * <p>It is its own event subscriber because RuneLite's event bus allows one handler per event
@@ -121,11 +121,23 @@ public final class RingMenuNames
 		{
 			return;
 		}
-		String code = codeIn(e.getOption());
+		String option = e.getOption();
+		String code = codeIn(option);
 		Ring r = code == null ? null : repo.ring(code);
 		if (r != null)
 		{
+			if (isLast(option))
+			{
+				// the name makes "destination" redundant
+				e.setOption("Last: " + code);
+			}
 			e.setTarget(ColorUtil.wrapWithColorTag(repo.displayName(r), TARGET));
 		}
+	}
+
+	/** Whether an option is the ring's "Last-destination (CODE)". */
+	static boolean isLast(String option)
+	{
+		return option != null && LAST.matcher(Text.removeTags(option).trim()).matches();
 	}
 }

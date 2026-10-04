@@ -440,6 +440,10 @@ public class RingDataTest
 		assertNull(RingMenuNames.codeIn("Last: Mount Karuulm"));
 		assertNull(RingMenuNames.codeIn("Configure"));
 		assertNull(RingMenuNames.codeIn("AIZ"));
+		assertTrue(RingMenuNames.isLast("Last-destination (AJR)"));
+		assertFalse(RingMenuNames.isLast("AJR"));
+		// once shortened to "Last: AJR" it is not renamed again
+		assertNull(RingMenuNames.codeIn("Last: AJR"));
 		assertTrue(RingMenuNames.isRing("<col=00ffff>Fairy ring</col>"));
 		assertTrue(RingMenuNames.isRing("Spiritual Fairy Tree"));
 		assertFalse(RingMenuNames.isRing("<col=00ffff>Mount Karuulm</col>"));
