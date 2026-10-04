@@ -15,20 +15,28 @@ import net.runelite.client.input.MouseWheelListener;
 
 /**
  * Mouse input over the map, on the AWT thread. It touches only the plugin's volatile and
- * synchronised view state. Wheel zooms; a left press on empty map pans; a left press on a marker,
- * card or button is let through so the game runs our RUNELITE menu entry (swallowed instead when
- * the game's menu was still built for something else, so no stale game entry runs); right presses
- * always go through to open the menu we built. Nothing is consumed inside the holes, while a menu
+ * synchronised view state. Wheel zooms; a left press on empty map pans; a left press on a marker
+ * or portal is held until release, so a click selects it but a drag starting on it pans; a left
+ * press on a card or button is let through so the game runs our RUNELITE menu entry (swallowed
+ * instead when the game's menu was still built for something else, so no stale game entry runs);
+ * right presses always go through to open the menu we built. Nothing is consumed inside the holes, while a menu
  * is open, or outside the map.
  */
 @Singleton
 public class AtlasInput extends MouseAdapter implements MouseWheelListener
 {
 	private static final double WHEEL_STEP = 1.25;
+	/** How far (px) a press may wander and still count as a click rather than a drag. */
+	static final int CLICK_SLOP = 4;
 
 	private final FairyRingAtlasPlugin plugin;
 	private volatile boolean dragging;
 	private volatile boolean swallow;
+	/** The marker or portal under the press: clicked on release unless the press became a drag. */
+	private volatile Hit pending;
+	private volatile boolean moved;
+	private int pressX;
+	private int pressY;
 	private int lastX;
 	private int lastY;
 
@@ -70,6 +78,20 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			return e;
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
+		if (hit != null && (hit.getKind() == Hit.Kind.MARKER || hit.getKind() == Hit.Kind.PORTAL))
+		{
+			// a click selects it, a drag pans the map; which one is only known on release
+			pending = hit;
+			moved = false;
+			dragging = true;
+			pressX = e.getX();
+			pressY = e.getY();
+			lastX = e.getX();
+			lastY = e.getY();
+			swallow = true;
+			e.consume();
+			return e;
+		}
 		if (hit != null && hit.isActionable() && plugin.isMenuFor(hit))
 		{
 			// the game runs the top menu entry, which is ours for this very hit
@@ -89,6 +111,15 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseDragged(MouseEvent e)
 	{
+		if (dragging && pending != null && !moved)
+		{
+			if (Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) <= CLICK_SLOP)
+			{
+				// still a click: a small wobble must not pan
+				return e;
+			}
+			moved = true;
+		}
 		if (dragging)
 		{
 			plugin.panBy(e.getX() - lastX, e.getY() - lastY);
@@ -103,6 +134,15 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseReleased(MouseEvent e)
 	{
+		Hit hit = pending;
+		if (hit != null)
+		{
+			pending = null;
+			if (!moved)
+			{
+				plugin.clickHit(hit);
+			}
+		}
 		if (dragging || swallow)
 		{
 			dragging = false;
@@ -126,5 +166,7 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	{
 		dragging = false;
 		swallow = false;
+		pending = null;
+		moved = false;
 	}
 }

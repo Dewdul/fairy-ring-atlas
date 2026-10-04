@@ -1042,6 +1042,39 @@ public class FairyRingAtlasPlugin extends Plugin
 		animateTo(v.focusOn(r.getX() + 0.5, r.getY() + 0.5, Math.max(v.getPpt() * 2, 4), insets(v.rect())));
 	}
 
+	/**
+	 * Input thread: a left click (pressed and released without dragging) on a marker or portal;
+	 * does what its left-click menu entry does. A press there that turns into a drag pans instead.
+	 */
+	void clickHit(Hit hit)
+	{
+		clientThread.invoke(() ->
+		{
+			if (!open || hit == null)
+			{
+				return;
+			}
+			if (hit.getKind() == Hit.Kind.PORTAL)
+			{
+				openCard(hit.getId());
+				return;
+			}
+			Ring r = hit.getRing();
+			if (r == null)
+			{
+				return;
+			}
+			if (r.isDialable())
+			{
+				select(r.getCode(), false);
+			}
+			else if (r.isMapped())
+			{
+				zoomTo(r);
+			}
+		});
+	}
+
 	/** A row in the Favourites list: select the ring and bring it into view, close enough to read. */
 	void showFavourite(Ring r)
 	{
