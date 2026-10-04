@@ -5,6 +5,7 @@
  */
 package com.fairyringatlas;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +20,9 @@ import lombok.Setter;
 public class Ring
 {
 	public static final String KIND_DESTINATION = "destination";
+	/** A query that could be the start of a code: dial 1 letter, then dial 2, then dial 3. */
+	private static final java.util.regex.Pattern CODE_PREFIX = java.util.regex.Pattern.compile("^[a-d](?:[i-l][p-s]?)?$");
+	private static final java.util.regex.Pattern WORD_BREAK = java.util.regex.Pattern.compile("[^a-z0-9]+");
 
 	private String code;
 	private String kind = KIND_DESTINATION;
@@ -50,7 +54,7 @@ public class Ring
 	/** Packed widget id of the star beside the row; -1 until read. */
 	@Setter
 	private transient int starComponent = -1;
-	private transient String haystack;
+	private transient List<String> words;
 
 	public Ring()
 	{
@@ -139,49 +143,80 @@ public class Ring
 	}
 
 	/**
-	 * Case-insensitive search over code (with or without spaces), name, area, POIs, tags and
-	 * description.
+	 * Whether the ring matches the travel log search. A query that could be the start of a code
+	 * ("c", "cl", "clr", or "c l r") matches only the codes that begin with it. Anything else
+	 * matches when every word typed is the start of a word in the ring's name, area, nearby places
+	 * or tags: "zul", "kq", "ice mount".
 	 */
 	public boolean matches(String query)
 	{
-		if (query == null || query.isEmpty())
+		if (query == null || query.trim().isEmpty())
 		{
 			return true;
 		}
-		if (haystack == null)
+		String q = query.trim().toLowerCase(Locale.ROOT);
+		String compact = q.replace(" ", "");
+		if (CODE_PREFIX.matcher(compact).matches())
 		{
-			StringBuilder sb = new StringBuilder();
-			if (code != null)
-			{
-				sb.append(code).append('\n').append(DialMath.spaced(code)).append('\n');
-			}
-			append(sb, name);
-			append(sb, area);
-			append(sb, description);
-			for (String s : getPoi())
-			{
-				append(sb, s);
-			}
-			for (String s : nonNull(tags))
-			{
-				append(sb, s);
-			}
-			haystack = sb.toString().toLowerCase(Locale.ROOT);
+			return code != null && code.toLowerCase(Locale.ROOT).startsWith(compact);
 		}
-		return haystack.contains(query.toLowerCase(Locale.ROOT).trim());
+		if (words == null)
+		{
+			List<String> w = new ArrayList<>();
+			addWords(w, code);
+			addWords(w, name);
+			addWords(w, area);
+			for (String p : getPoi())
+			{
+				addWords(w, p);
+			}
+			for (String t : nonNull(tags))
+			{
+				addWords(w, t);
+			}
+			words = w;
+		}
+		for (String part : WORD_BREAK.split(q))
+		{
+			if (!part.isEmpty() && !startsAWord(words, part))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Lower-case words, split at anything that is not a letter or digit. */
+	static void addWords(List<String> out, String text)
+	{
+		if (text == null)
+		{
+			return;
+		}
+		for (String w : WORD_BREAK.split(text.toLowerCase(Locale.ROOT)))
+		{
+			if (!w.isEmpty())
+			{
+				out.add(w);
+			}
+		}
+	}
+
+	static boolean startsAWord(List<String> words, String prefix)
+	{
+		for (String w : words)
+		{
+			if (w.startsWith(prefix))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	void resetSearchCache()
 	{
-		haystack = null;
-	}
-
-	private static void append(StringBuilder sb, String s)
-	{
-		if (s != null)
-		{
-			sb.append(s).append('\n');
-		}
+		words = null;
 	}
 
 	private static List<String> nonNull(List<String> list)

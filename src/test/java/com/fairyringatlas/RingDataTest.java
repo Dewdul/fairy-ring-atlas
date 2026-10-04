@@ -341,6 +341,26 @@ public class RingDataTest
 	}
 
 	@Test
+	public void codePrefixesMatchOnlyCodes()
+	{
+		RingRepository repo = real();
+		// "cl" could be the start of a code: only CL* codes, nothing that merely contains "cl"
+		List<String> cl = new ArrayList<>();
+		for (Ring r : repo.matching("cl"))
+		{
+			cl.add(r.getCode());
+		}
+		java.util.Collections.sort(cl);
+		assertEquals(Arrays.asList("CLP", "CLR", "CLS"), cl);
+		assertTrue(repo.ring("CLR").matches("c l r"));
+		assertFalse(repo.ring("BKS").matches("cl"));
+		// words match from their start, not from the middle
+		assertTrue(repo.ring("BJS").matches("zul"));
+		assertFalse(repo.ring("BJS").matches("ulr"));
+		assertTrue(repo.ring("AIQ").matches("ice dung"));
+	}
+
+	@Test
 	public void state()
 	{
 		RingRepository repo = RingRepository.load(new Gson(), FIXTURES);
