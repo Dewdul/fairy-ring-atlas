@@ -22,8 +22,9 @@ import net.runelite.client.util.Text;
 /**
  * Puts destination names in a fairy ring's own right-click menu: "Last-destination (AJR) Fairy
  * ring" reads "Last (AJR) Fremennik Slayer Dungeon", and the codes in its Favourites submenu get
- * the ring's name as their target, so "CIR Fairy ring" reads "CIR Mount Karuulm". It only relabels entries the game made; it never adds, removes or
- * reorders one. An entry another plugin has already renamed is left alone.
+ * the ring's name as their target, so "CIR Fairy ring" reads "CIR Mount Karuulm". It only
+ * relabels entries the game made; it never adds, removes or reorders one. An entry another plugin
+ * has already renamed is left alone.
  *
  * <p>It is its own event subscriber because RuneLite's event bus allows one handler per event
  * per object, named after the event, and the plugin already handles PostMenuSort for the map.
