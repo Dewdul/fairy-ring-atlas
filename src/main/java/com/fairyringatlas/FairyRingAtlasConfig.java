@@ -44,46 +44,54 @@ public interface FairyRingAtlasConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(keyName = "useFreeSpace", name = "Use free space",
+		description = "Resizable mode: while the map shows, move the fairy ring interface into the corner of the free screen space so the map can fill it. It goes back when the map closes",
+		section = mapSection, position = 1)
+	default boolean useFreeSpace()
+	{
+		return true;
+	}
+
 	@Range(min = 512, max = 2000)
-	@ConfigItem(keyName = "maxWidth", name = "Max width",
-		description = "Largest map width in pixels (resizable mode)", section = mapSection, position = 1)
+	@ConfigItem(keyName = "mapMaxWidth", name = "Max width",
+		description = "Largest map width in pixels (resizable mode). With Use free space, a smaller map is centred in the free space", section = mapSection, position = 2)
 	default int maxWidth()
 	{
-		return 1100;
+		return 2000;
 	}
 
 	@Range(min = 334, max = 1400)
-	@ConfigItem(keyName = "maxHeight", name = "Max height",
-		description = "Largest map height in pixels (resizable mode)", section = mapSection, position = 2)
+	@ConfigItem(keyName = "mapMaxHeight", name = "Max height",
+		description = "Largest map height in pixels (resizable mode). With Use free space, a smaller map is centred in the free space", section = mapSection, position = 3)
 	default int maxHeight()
 	{
-		return 720;
+		return 1400;
 	}
 
 	@ConfigItem(keyName = "openAt", name = "Open at",
 		description = "Centre the map on the ring you are standing at, fit all rings, or remember the last view this session",
-		section = mapSection, position = 3)
+		section = mapSection, position = 4)
 	default StartView startView()
 	{
 		return StartView.AROUND_YOU;
 	}
 
 	@ConfigItem(keyName = "placeLabels", name = "Place names",
-		description = "Show world map place names", section = mapSection, position = 4)
+		description = "Show world map place names", section = mapSection, position = 5)
 	default boolean placeLabels()
 	{
 		return true;
 	}
 
 	@ConfigItem(keyName = "mapIcons", name = "Map icons",
-		description = "Show world map icons when zoomed in", section = mapSection, position = 5)
+		description = "Show world map icons when zoomed in", section = mapSection, position = 6)
 	default boolean mapIcons()
 	{
 		return true;
 	}
 
 	@ConfigItem(keyName = "autoFitSearch", name = "Fit to search",
-		description = "Zoom the map to the rings matching the travel log search", section = mapSection, position = 6)
+		description = "Zoom the map to the rings matching the travel log search", section = mapSection, position = 7)
 	default boolean autoFitSearch()
 	{
 		return true;
@@ -91,7 +99,7 @@ public interface FairyRingAtlasConfig extends Config
 
 	@ConfigItem(keyName = "fullDetails", name = "Full ring details",
 		description = "Show everything about a ring on its card (description, every nearby place, notes) instead of a short summary",
-		section = mapSection, position = 7)
+		section = mapSection, position = 8)
 	default boolean fullDetails()
 	{
 		return false;

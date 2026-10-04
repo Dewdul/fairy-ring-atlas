@@ -34,12 +34,14 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.CanvasSizeChanged;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PostMenuSort;
+import net.runelite.api.events.ResizeableChanged;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.VarClientStrChanged;
 import net.runelite.api.events.VarbitChanged;
@@ -211,6 +213,8 @@ public class FairyRingAtlasPlugin extends Plugin
 	 * shows its own hover card; it is turned back on as soon as the map is not showing.
 	 */
 	private boolean mouseoverHiddenByUs;
+	/** The dials' slot, moved into the free space while the map shows in resizable mode. */
+	private final ModalSlot modalSlot = new ModalSlot();
 	/** The code the player picked in the travel log itself; the log is not filtered for it. */
 	private String logPicked;
 	/** Whether the decoded tiles and map-sized caches were released since the interface closed. */
@@ -297,6 +301,12 @@ public class FairyRingAtlasPlugin extends Plugin
 		if (e.getGroupId() == InterfaceID.FAIRYRINGS && !open)
 		{
 			onDialsOpened();
+		}
+		else if (e.getGroupId() != InterfaceID.FAIRYRINGS && modalSlot.holds())
+		{
+			// before the new interface's first frame: if it took the dials' slot (or the toplevel
+			// changed), put the slot back now rather than at the next tick
+			updateSlot();
 		}
 	}
 
@@ -428,6 +438,8 @@ public class FairyRingAtlasPlugin extends Plugin
 		{
 			return;
 		}
+		// the slot is a toplevel component the game may keep or reload: put back what we wrote to it
+		modalSlot.restore(client);
 		if (open)
 		{
 			// the interface tree is gone: drop our records rather than touch orphaned widgets
@@ -470,6 +482,10 @@ public class FairyRingAtlasPlugin extends Plugin
 		}
 		if (!open)
 		{
+			if (modalSlot.holds())
+			{
+				modalSlot.restore(client);
+			}
 			// free the decoded tiles and map-sized buffers once the ring has been left alone for a
 			// while; a quick reopen (a favourite toggle, the next trip) stays warm
 			int tick = client.getTickCount();
@@ -487,6 +503,24 @@ public class FairyRingAtlasPlugin extends Plugin
 		if (config.clueHelper())
 		{
 			clue = clueHelper.location();
+		}
+	}
+
+	@Subscribe
+	public void onCanvasSizeChanged(CanvasSizeChanged e)
+	{
+		if (open || modalSlot.holds())
+		{
+			updateSlot();
+		}
+	}
+
+	@Subscribe
+	public void onResizeableChanged(ResizeableChanged e)
+	{
+		if (open || modalSlot.holds())
+		{
+			updateSlot();
 		}
 	}
 
@@ -644,6 +678,10 @@ public class FairyRingAtlasPlugin extends Plugin
 				{
 					applyLogFilter();
 				}
+				if (open || modalSlot.holds())
+				{
+					updateSlot();
+				}
 			});
 		}
 	}
@@ -677,6 +715,17 @@ public class FairyRingAtlasPlugin extends Plugin
 			client.setMouseoverTextEnabled(false);
 			mouseoverHiddenByUs = true;
 		}
+		updateSlot();
+	}
+
+	/**
+	 * Resizable mode, "Use free space": while the map shows, the dials' slot sits in the corner of
+	 * the free space (so the map fills it); otherwise it is where the game put it.
+	 */
+	private void updateSlot()
+	{
+		boolean wanted = open && mode == Mode.MAP && config.useFreeSpace() && client.isResized();
+		modalSlot.update(client, wanted, config.maxWidth(), config.maxHeight());
 	}
 
 	/** Turn the game's mouse-over text back on, if we turned it off. */
@@ -711,6 +760,7 @@ public class FairyRingAtlasPlugin extends Plugin
 			}
 		}
 		movedByUs.clear();
+		modalSlot.restore(client);
 		restoreMouseoverText();
 	}
 

@@ -74,6 +74,10 @@ public class MapPreview
 		render(repo, painter, out, "5-fixed-fit", FairyRingAtlasPlugin.fitRings(MapView.of(surface, fixed), repo.ringsIn(Layer.SURFACE), 0, narrow),
 			"AIS", null, new int[]{1, 3, 0}, true);
 		render(repo, painter, out, "6-kandarin-1ppt", MapView.of(surface, big).focusOn(2620, 3350, 1.25, wide), "CKS", "ALS", new int[]{2, 2, 2}, false);
+		// "Use free space" on a 2000x1082 resizable canvas: all of the HUD area but its 6 px inset
+		Rectangle free = new Rectangle(30, 30, 1738, 905);
+		render(repo, painter, out, "8-free-space", FairyRingAtlasPlugin.fitRings(MapView.of(surface, free), repo.ringsIn(Layer.SURFACE), 0, wide),
+			"CKS", "AIQ", new int[]{0, 1, 2}, false);
 		ringChecks(repo, painter, out);
 		icons(repo, painter, out);
 	}

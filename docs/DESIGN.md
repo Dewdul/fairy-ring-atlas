@@ -52,8 +52,15 @@ reviewer rulings. Breaking one gets the plugin rejected.
    - In map mode, CONFIRM (Teleport), its plaque `ROOT_MODEL25` and the close
      button `ROOT_GRAPHIC27` may be moved, only inside the dials' own 512x334
      rectangle (`MOVED_IN_MAP`). Their ops and scripts are untouched, and each
-     is put back exactly when map mode ends. Never move anything else of 398's,
-     or the top-level modal containers.
+     is put back exactly when map mode ends. Never move anything else of 398's.
+   - In resizable map mode with "Use free space" on, the **position, never the
+     size**, of the resizable main modal slot that holds 398
+     (`ToplevelOsrsStretch.MAINMODAL` / `ToplevelPreEoc.MAINMODAL`) may be
+     moved (`ModalSlot`). Only from the state the toplevel defines (centred, no
+     offset, 512x334, the dials filling it), and put back exactly when map mode
+     ends, and only while it still holds what we wrote. Never touch any other
+     top-level component, the fixed-mode slot, or a slot another plugin or
+     interface has changed.
 5. **No network access at runtime.** All imagery and data are bundled.
 6. **Image budget.** The hub bot rejects any bundled image whose decoded size
    (w*h*4) is about 1 MiB or more. Every bundled PNG is therefore at most
@@ -181,7 +188,10 @@ reviewer rulings. Breaking one gets the plugin rejected.
 - **Fixed mode:** the dial interface fills the 512x334 viewport at canvas (4,4).
   The log is at (547,205), 190x261.
 - **Resizable:** the dial is centred in the area above the chatbox and left of
-  the side panel. The log is in the side-panel area, bottom right.
+  the side panel (the toplevel's `HUD_CONTAINER_FRONT`, the canvas minus
+  250x165 in classic and 215x165 in modern layout; its `MAINMODAL` slot is
+  512x334, centred on both axes). The log is in the side-panel area, bottom
+  right. With "Use free space" the plugin moves that slot (4.2).
 - Always use live `Widget.getBounds()`.
 
 ---
@@ -347,12 +357,21 @@ default (config `openInMapMode`). The overlay draws only while 398 is open.
      chatbox's live bounds if it is visible.
 2. The map grows up and left from the dials' bottom-right corner, where
    Teleport and the close button are moved. Size it `W×H` = min(config
-   `maxWidth` (default 1100), dials' right - avail.left) by min(config
-   `maxHeight` (default 720), dials' bottom - avail.top).
+   `maxWidth` (default 2000), dials' right - avail.left) by min(config
+   `maxHeight` (default 1400), dials' bottom - avail.top).
 3. Never make it smaller than the dial rect (512x334). If `avail` is smaller
    than that, use the dial rect.
 4. Its right and bottom edges are the dials' own, so the dial rect, and with
    it every hole, always lies inside the map.
+5. **Use free space** (config `useFreeSpace`, default on). The game centres the
+   dials, so growing from their corner leaves the space right of and below
+   them unused. While the map shows, `ModalSlot` moves the dials' slot so
+   their bottom-right corner is at `MapLayout.slotCorner`: the bottom-right of
+   the free space, which is the slot's container inset by 6 px and cut clear of
+   the same obstacles as in step 1. When the size caps leave the map smaller
+   than the free space, the corner goes where the map comes out centred in it.
+   There is no move when the dials do not fit, or when the corner would move
+   less than 8 px. Step 2 then fills the space.
 
 **Fixed mode** (`!client.isResized()`): the map rect equals the dial rect.
 
@@ -690,8 +709,9 @@ Group `fairyringatlas`. Sections: Map, Markers, Travel log, Advanced.
 | Key | Type | Default |
 |---|---|---|
 | `openInMapMode` | boolean | true |
-| `maxWidth` | int px | 1100, range 512–2000 |
-| `maxHeight` | int px | 720, range 334–1400 |
+| `useFreeSpace` | boolean | true; resizable mode only (4.2 step 5) |
+| `maxWidth` (key `mapMaxWidth`) | int px | 2000, range 512–2000 |
+| `maxHeight` (key `mapMaxHeight`) | int px | 1400, range 334–1400 |
 | `startView` | enum FIT_ALL / AROUND_YOU / REMEMBER | FIT_ALL |
 | `codeLabels` | enum ALL / FAVOURITES / NONE | ALL |
 | `placeLabels` | boolean | true |
@@ -737,7 +757,8 @@ plugin is enabled, the two would fight.
 | `RingRepository` | Loads JSON, reads the DB table, holds visited / favourite / last state |
 | `DialMath` | Letter orders, code↔dial values, rotation plan. Pure; unit tested |
 | `MapView` | Immutable view (layer, cx, cy, ppt, rect), world↔screen transforms, zoomAbout, fit, clamp. Pure; unit tested |
-| `MapLayout` | Computes the map rect and holes from widget bounds |
+| `MapLayout` | Computes the map rect and holes from widget bounds, and where the dials' slot goes for "Use free space" (`slotCorner`). Pure apart from `fromClient`; unit tested |
+| `ModalSlot` | Moves the resizable modal slot into the free space and puts it back; its guards are pure static methods, unit tested |
 | `TileStore` | Resource loading, LRU, async decode, derived levels |
 | `MapRenderer` | Draws the base map into the cache image |
 | `AtlasOverlay` | Draws everything; hit-testing helpers (marker, button, card at point) |
@@ -751,6 +772,8 @@ plugin is enabled, the two would fight.
 - `DialMathTest`
 - `MapViewTest`
 - `LabelPlacerTest`
+- `ModalSlotTest`: `slotCorner` geometry, the pristine / ours guards and the
+  move and restore paths against a fake toplevel.
 - `RingDataTest`: loads the real `rings.json` and `index.json` and checks that
   every ring lies in its layer's bounds, that codes are unique, and that every
   index tile exists as a resource.
@@ -1093,3 +1116,82 @@ default font when `FontManager` is unavailable).
   8 Hosidius, 9 Prifddinas, 13 Aldarin. It moves DIQ onto the surface layer at that portal.
   Prifddinas lies outside the bundled map, so it keeps the card only, named for the town. The
   side panel's *Your house* card stays and selects DIQ and zooms to it.
+
+### Free space in resizable mode (added 2026-10-03, at the user's request)
+
+In resizable mode the map used to grow up and left from the dials, which the game centres in
+its HUD area, so the space right of and below them went unused: on a 2000x1082 classic canvas
+the map was at most 1100x601 with about 600 px empty on the right. Now, with **Use free space**
+(`useFreeSpace`, default on), `ModalSlot` moves the dials' slot so their bottom-right corner sits
+at the bottom-right of the free space, and the existing up-left growth fills it (about 1738x905
+on that canvas). This revised hard rule 4, which used to forbid moving "the top-level modal
+containers"; that clause was our own conservative rule, not a reviewer ruling.
+
+**How it moves.** `setXPositionMode(ABSOLUTE_RIGHT)`, `setYPositionMode(ABSOLUTE_BOTTOM)`,
+`setOriginalX/Y` (the corner's offset from the container's bottom-right) and `revalidate()`.
+The size is never written. No script is run.
+- The slot is `getWidget(Fairyrings.ROOT_RECT0).getParent()`, and only when it is
+  `ToplevelOsrsStretch.MAINMODAL` (10551312) or `ToplevelPreEoc.MAINMODAL` (10747920). Its
+  container is `HUD_CONTAINER_FRONT` (10551311 / 10747919). The fixed slot (`Toplevel.MAINMODAL`)
+  and the other toplevels' slots are never touched.
+- Anchoring to the right and bottom means the game keeps the corner across window resizes by
+  itself, and a modal opened into a slot we somehow failed to restore still opens fully on
+  screen (a full-height one, such as the bank, loses only the ~6 px offset at the top).
+  `setForcedPosition` or a centred offset would push such a modal about 290 px off screen.
+- `MapLayout.slotCorner` reuses `compute`'s four-way obstacle cut on the container inset by
+  6 px. It returns no corner when the dials do not fit or the gain is under 8 px, which also
+  makes it step aside when another plugin has resized the HUD area.
+
+**Guards.**
+- *Pristine:* the slot is moved only from its interface definition's state: both position
+  modes `ABSOLUTE_CENTER`, both offsets 0, both size modes `ABSOLUTE`, 512x334, and the dials'
+  bounds equal to the slot's. This skips a slot left full-height by a modal that set
+  `%toplevel_mainmodal_bg_trans` to -2/-3, and one held by another plugin (Fixed Resizable
+  Hybrid changes its y mode and height).
+- *Ours:* the slot is written again, or restored, only while its four position fields are
+  exactly what we wrote. If anything changed them since, the record is dropped without writing.
+  There is no start-up scan that resets slots we never touched.
+
+**Restore triggers.** Map to Dial mode; `WidgetClosed(398)` and the per-tick missed-close
+check; `GameStateChanged` to anything but `LOGGED_IN`, `LOADING` or `CONNECTION_LOST` (login
+screen, hopping), written back to the held `Widget` object; `shutDown`, inside its client-thread
+block; the dials' parent no longer being the held slot (toplevel switch, `ResizeableChanged`);
+a `WidgetLoaded` of any other group while a record is held, before that interface's first frame;
+the option turned off; no worthwhile corner any more. A slot that is no longer the live widget
+for its id (left behind by a toplevel switch or logout) gets its fields written back but is not
+revalidated. The corner is recomputed on `GameTick`, `CanvasSizeChanged` and config changes,
+and written only when it changes.
+
+**Evidence** (research and critique, 2026-10-03):
+- *No desktop game script positions MAINMODAL.* `toplevel_resize` (909), run from
+  `toplevel_init` (901), `toplevel_subchange` (908) and `toplevel_redraw` (907), only calls
+  `if_setsize(512,334)` on it; the only `if_setposition` calls on it are in mobile-only procs.
+  A position we set therefore survives resizes, and the game re-aligns from our values.
+- *Order of events.* `openInterface` closes the old interface first, and `WidgetClosed` is
+  posted before the close, so a restore lands before the next modal mounts. `WidgetLoaded` is
+  posted before the first draw, so the move causes no one-frame jump. The dials' children are
+  positioned relative to the slot and need no re-layout.
+- *Precedent.* Core RuneLite's `WidgetOverlay` lets players drag `CHAT_CONTAINER`, `SIDE_MENU`,
+  `SIDE_CONTAINER` and `MAP_CONTAINER` with `setForcedPosition`, and the interfaces in them
+  draw and click normally. Fixed Resizable Hybrid (Plugin Hub, plugin-hub #16219) writes
+  `ToplevelOsrsStretch.MAINMODAL`'s y mode, `originalY` and height and restores them. Better
+  Resizable Chat (plugin-hub #12663) re-aligns mounted modals. Jagex's guidelines restrict
+  moving click zones only for 3D components, combat options, the inventory, equipment and
+  spellbook, and resizing on the prayer book; MAINMODAL is none of these.
+
+**Size caps.** Without raising them the move only shifted the empty space from the right to the
+left, so the defaults are now the range maxima, 2000x1400; a smaller cap is centred in the free
+space. The config keys were renamed to `mapMaxWidth` / `mapMaxHeight`, because RuneLite stores
+each default in the profile on first start and the old keys would keep 1100x720 for anyone who
+already ran the plugin. Base-map memory at the full size stays inside the `TileStore` budget
+(4.8 already allows for 2000x1400). The preview `8-free-space.png` renders a 1738x905 map.
+
+**Not verified without the game** (test in game):
+- whether 398 gets the dimmed modal background: `toplevel_mainmodal_bg_calculate` (910) builds
+  its bands around a centred 512x334 hole, so they would be misplaced while moved. The opaque
+  map covers them except inside the Teleport and close holes;
+- classic and modern layouts, each narrow and wide; alt-dragging the chatbox and side panel;
+- switching layout, logging out and hopping with the dials open; toggling a favourite (398
+  closes and reopens within about 2 ticks);
+- with Fixed Resizable Hybrid and with Better Resizable Chat;
+- opening the bank and the GE right after the dials: they must open centred.
