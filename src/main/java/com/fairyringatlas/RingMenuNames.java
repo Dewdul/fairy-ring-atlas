@@ -7,10 +7,15 @@ package com.fairyringatlas;
 
 import java.awt.Color;
 import java.util.Locale;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.runelite.api.Client;
 import net.runelite.api.Menu;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.events.MenuOpened;
+import net.runelite.api.events.PostMenuSort;
+import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.Text;
 
@@ -19,16 +24,45 @@ import net.runelite.client.util.Text;
  * the codes in its Favourites submenu get the ring's name as their target, so "CIR Fairy ring"
  * reads "CIR Mount Karuulm". It only relabels entries the game made; it never adds, removes or
  * reorders one. An entry another plugin has already renamed is left alone.
+ *
+ * <p>It is its own event subscriber because RuneLite's event bus allows one handler per event
+ * per object, named after the event, and the plugin already handles PostMenuSort for the map.
  */
-final class RingMenuNames
+public final class RingMenuNames
 {
 	private static final Pattern CODE = Pattern.compile("^([A-D][I-L][P-S])$");
 	private static final Pattern LAST = Pattern.compile("^(?:Ring-)?Last-destination \\(([A-D][I-L][P-S])\\)$", Pattern.CASE_INSENSITIVE);
 	/** The game's colour for object names in menus. */
 	private static final Color TARGET = new Color(0x00FFFF);
 
-	private RingMenuNames()
+	private final Client client;
+	private final FairyRingAtlasConfig config;
+	private final Supplier<RingRepository> repo;
+
+	RingMenuNames(Client client, FairyRingAtlasConfig config, Supplier<RingRepository> repo)
 	{
+		this.client = client;
+		this.config = config;
+		this.repo = repo;
+	}
+
+	/** After Menu Entry Swapper and Fairy Ring Favourites, which may rename the same entries. */
+	@Subscribe(priority = -2)
+	public void onPostMenuSort(PostMenuSort e)
+	{
+		if (!client.isMenuOpen() && config.menuNames())
+		{
+			relabel(client.getMenu(), repo.get());
+		}
+	}
+
+	@Subscribe(priority = -2)
+	public void onMenuOpened(MenuOpened e)
+	{
+		if (config.menuNames())
+		{
+			relabel(client.getMenu(), repo.get());
+		}
 	}
 
 	/** The code an entry's option names ("CIR" or "Last-destination (AJR)"), or null. */

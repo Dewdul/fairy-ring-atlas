@@ -37,7 +37,6 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
-import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.ResizeableChanged;
@@ -53,6 +52,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.input.MouseManager;
@@ -140,6 +140,10 @@ public class FairyRingAtlasPlugin extends Plugin
 	private OverlayManager overlayManager;
 	@Inject
 	private MouseManager mouseManager;
+	@Inject
+	private EventBus eventBus;
+	/** Names in the fairy ring's own right-click menu; a subscriber of its own (see RingMenuNames). */
+	private RingMenuNames menuNames;
 	@Inject
 	private PluginManager pluginManager;
 	@Inject
@@ -248,6 +252,8 @@ public class FairyRingAtlasPlugin extends Plugin
 		tiles = new TileStore(repo.getIndex(), repo.getLayers(), RESOURCES, executor);
 		travelLog = new TravelLogController(client);
 		overlayManager.add(overlay);
+		menuNames = new RingMenuNames(client, config, () -> repo);
+		eventBus.register(menuNames);
 		mouseManager.registerMouseListener(input);
 		mouseManager.registerMouseWheelListener(input);
 		log.debug("started: rings={} index={} imagery={}", repo.isRingsLoaded(), repo.isIndexLoaded(), tiles.hasImagery());
@@ -264,6 +270,11 @@ public class FairyRingAtlasPlugin extends Plugin
 	protected void shutDown()
 	{
 		overlayManager.remove(overlay);
+		if (menuNames != null)
+		{
+			eventBus.unregister(menuNames);
+			menuNames = null;
+		}
 		mouseManager.unregisterMouseListener(input);
 		mouseManager.unregisterMouseWheelListener(input);
 		input.reset();
@@ -603,28 +614,6 @@ public class FairyRingAtlasPlugin extends Plugin
 		}
 		s = s.toLowerCase(Locale.ROOT);
 		return s.length() > SEARCH_MAX ? s.substring(0, SEARCH_MAX) : s;
-	}
-
-	/**
-	 * Destination names in the fairy ring's own menu ("Last-destination (AJR)" and the Favourites
-	 * codes). After Menu Entry Swapper and Fairy Ring Favourites, which may rename the same entries.
-	 */
-	@Subscribe(priority = -2)
-	public void onPostMenuSortNames(PostMenuSort e)
-	{
-		if (!client.isMenuOpen() && config.menuNames())
-		{
-			RingMenuNames.relabel(client.getMenu(), repo);
-		}
-	}
-
-	@Subscribe(priority = -2)
-	public void onMenuOpened(MenuOpened e)
-	{
-		if (config.menuNames())
-		{
-			RingMenuNames.relabel(client.getMenu(), repo);
-		}
 	}
 
 	@Subscribe
