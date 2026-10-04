@@ -37,6 +37,7 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.events.ScriptPostFired;
@@ -578,6 +579,28 @@ public class FairyRingAtlasPlugin extends Plugin
 		}
 		s = s.toLowerCase(Locale.ROOT);
 		return s.length() > SEARCH_MAX ? s.substring(0, SEARCH_MAX) : s;
+	}
+
+	/**
+	 * Destination names in the fairy ring's own menu ("Last-destination (AJR)" and the Favourites
+	 * codes). After Menu Entry Swapper and Fairy Ring Favourites, which may rename the same entries.
+	 */
+	@Subscribe(priority = -2)
+	public void onPostMenuSortNames(PostMenuSort e)
+	{
+		if (!client.isMenuOpen() && config.menuNames())
+		{
+			RingMenuNames.relabel(client.getMenu(), repo);
+		}
+	}
+
+	@Subscribe(priority = -2)
+	public void onMenuOpened(MenuOpened e)
+	{
+		if (config.menuNames())
+		{
+			RingMenuNames.relabel(client.getMenu(), repo);
+		}
 	}
 
 	@Subscribe
@@ -1143,7 +1166,7 @@ public class FairyRingAtlasPlugin extends Plugin
 				}
 				if (r.isDialable())
 				{
-					add(menu, "Select", hit.getTarget(), Hit.FAVE.equals(hit.getId()) ? m -> showFavourite(r)
+					add(menu, "Select", hit.getTarget(), Hit.FAVE.equals(hit.getId()) || Hit.HOUSE.equals(hit.getId()) ? m -> showFavourite(r)
 						: m -> select(r.getCode(), hit.getKind() == Hit.Kind.CHIP));
 				}
 				break;

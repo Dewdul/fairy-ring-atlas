@@ -1081,3 +1081,15 @@ default font when `FontManager` is unavailable).
   because it overlapped the map's title and the map has its own hover card. It is turned back
   on (only if we turned it off) when the map closes, in Dial mode, on logout and on shutdown.
   This is display-only and sends nothing to the game.
+- **Names in the ring's own menu** (`menuNames`, default on; `RingMenuNames`). On
+  `PostMenuSort` (menu closed) and `MenuOpened`, at priority -2 so after Menu Entry Swapper and
+  Fairy Ring Favourites, entries on a fairy ring (or the house's Spiritual Fairy Tree) whose
+  option is a bare code or "Last-destination (CODE)" get the ring's name as their target.
+  It only relabels existing entries (precedent: Fairy Ring Favourites, core Menu Entry
+  Swapper). An entry whose option or target was already changed is skipped.
+- **The house's ring at the portal.** `RingRepository.placeHouse` reads POH_HOUSE_LOCATION
+  (2187) using the value-to-portal table from Shortest Path's teleport data:
+  1 Rimmington (2953,3224), 2 Taverley, 3 Pollnivneach, 4 Rellekka, 5 Brimhaven, 6 Yanille,
+  8 Hosidius, 9 Prifddinas, 13 Aldarin. It moves DIQ onto the surface layer at that portal.
+  Prifddinas lies outside the bundled map, so it keeps the card only, named for the town. The
+  side panel's *Your house* card stays and selects DIQ and zooms to it.

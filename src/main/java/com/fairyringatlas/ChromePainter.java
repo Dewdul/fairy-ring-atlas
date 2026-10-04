@@ -348,10 +348,12 @@ public class ChromePainter
 				out.add(new Card(l.getId(), l.getName(), rings));
 			}
 		}
-		List<Ring> house = s.repo.ringsIn(Layer.POH);
-		if (!house.isEmpty())
+		// the house's ring keeps its card even when it is drawn at the portal on the world map
+		Ring house = s.repo.ring("DIQ");
+		if (house != null)
 		{
-			out.add(new Card(Layer.POH, "Your house", house));
+			String town = s.repo.getHouseTown();
+			out.add(new Card(Layer.POH, town == null ? "Your house" : "Your house (" + town + ")", java.util.Collections.singletonList(house)));
 		}
 		return out;
 	}
@@ -446,7 +448,7 @@ public class ChromePainter
 			{
 				if (house != null)
 				{
-					s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(card, content), house, null, "Select", house.getCode() + " " + house.getName()));
+					s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(card, content), house, Hit.HOUSE, "Select", house.getCode() + " " + s.repo.displayName(house)));
 				}
 				else
 				{
@@ -647,7 +649,7 @@ public class ChromePainter
 		boolean full = s.fullDetails;
 
 		List<Line> lines = new ArrayList<>();
-		String title = (ring.getCode() != null && ring.isDialable() ? ring.getCode() + "  " : "") + ring.getName();
+		String title = (ring.getCode() != null && ring.isDialable() ? ring.getCode() + "  " : "") + s.repo.displayName(ring);
 		if (full)
 		{
 			for (String t : ink.wrap(title, ink.bold, textW))

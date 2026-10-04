@@ -44,6 +44,8 @@ public class Hit
 	public static final String SHOW_MAP = "map";
 	/** Id of a ring row in the panel's Favourites list. */
 	public static final String FAVE = "fave";
+	/** Id of the house card in the side panel (a CHIP hit). */
+	public static final String HOUSE = "house";
 
 	Kind kind;
 	Rectangle area;

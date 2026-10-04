@@ -5,6 +5,8 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 ## Features
 
 - **Map of every ring.** All 42 surface rings appear on a world map. You can zoom from an overview of the whole map down to individual buildings: scroll to zoom and drag to pan.
+- **Names in the ring's own menu.** Right-click a fairy ring and *Last-destination (AJR)* and the *Favourites* codes show the destination's name, e.g. *CIR Mount Karuulm*. Entries Fairy Ring Favourites has already renamed are left alone.
+- **Your house.** DIQ is drawn at your house portal (Rimmington, Taverley, Pollnivneach, Rellekka, Brimhaven, Yanille, Hosidius or Aldarin), and the *Your house* card zooms to it. It shows as locked until you have used a fairy ring in your house.
 - **Favourites list.** Your in-game favourites (starred in the travel log) are listed at the top of the side panel. Click one to select it and zoom to it. Its card also reminds you of the game's own one-click teleport: right-click any fairy ring, then *Favourites*. Your last destination gets the same tip for *Last-destination*.
 - **Off-surface destinations.** These include Zanaris, the Abyss, Mor Ul Rek, the Cosmic entity's plane and the other realms. Each one has a map of its own, opened from the *Elsewhere* section of the side panel or from a portal marker on the surface. Opening one also selects its ring (the first one in your travel log, when an area has two). The orange **Back to Gielinor** button at its top-left returns to the world map. *Your house* (DIQ) has a card.
 - **Ring cards.** Hover over any ring for its code, name and area. The card also shows:

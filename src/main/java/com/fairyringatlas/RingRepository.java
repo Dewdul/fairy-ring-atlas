@@ -72,6 +72,36 @@ public class RingRepository
 	private String lastCode;
 	@Getter
 	private boolean staffless;
+	/** The town of the player's house portal, or null when unknown (or no house). */
+	@Getter
+	private String houseTown;
+	private int houseValue = -1;
+
+	/**
+	 * House portals by the value of POH_HOUSE_LOCATION (2187), as Shortest Path reads it. A
+	 * portal outside the bundled map (Prifddinas) has no position.
+	 */
+	private static final Map<Integer, int[]> HOUSE_PORTALS = new HashMap<>();
+	private static final Map<Integer, String> HOUSE_TOWNS = new HashMap<>();
+
+	static
+	{
+		house(1, "Rimmington", 2953, 3224);
+		house(2, "Taverley", 2893, 3465);
+		house(3, "Pollnivneach", 3340, 3003);
+		house(4, "Rellekka", 2670, 3631);
+		house(5, "Brimhaven", 2757, 3178);
+		house(6, "Yanille", 2544, 3096);
+		house(8, "Hosidius", 1743, 3517);
+		house(9, "Prifddinas", 0, 0);
+		house(13, "Aldarin", 1422, 2963);
+	}
+
+	private static void house(int value, String town, int x, int y)
+	{
+		HOUSE_TOWNS.put(value, town);
+		HOUSE_PORTALS.put(value, new int[]{x, y});
+	}
 	/** Changes whenever visited, favourites or the last destination change; for cache keys. */
 	@Getter
 	private int stateHash;
@@ -362,7 +392,44 @@ public class RingRepository
 		lastCode = client.getVarbitValue(VarbitID.FAIRYRING_LASTLOC_SET) == 1
 			? DialMath.fromIndex(client.getVarbitValue(VarbitID.FAIRYRING_LASTLOC)) : null;
 		staffless = client.getVarbitValue(VarbitID.LUMBRIDGE_DIARY_ELITE_COMPLETE) == 1;
-		stateHash = java.util.Objects.hash(visited, favourites, lastCode);
+		placeHouse(client.getVarbitValue(VarbitID.POH_HOUSE_LOCATION));
+		stateHash = java.util.Objects.hash(visited, favourites, lastCode, houseValue);
+	}
+
+	/**
+	 * Puts DIQ (the house's own ring) at the player's house portal on the world map, so it can be
+	 * found and zoomed to; with no known portal on the map it stays on the house card only.
+	 */
+	void placeHouse(int value)
+	{
+		Ring diq = byCode.get("DIQ");
+		houseValue = value;
+		houseTown = HOUSE_TOWNS.get(value);
+		if (diq == null)
+		{
+			return;
+		}
+		int[] at = HOUSE_PORTALS.get(value);
+		Layer surface = surface();
+		if (at != null && at[0] != 0 && surface != null && surface.contains(at[0], at[1]))
+		{
+			diq.setX(at[0]);
+			diq.setY(at[1]);
+			diq.setPlane(0);
+			diq.setLayer(Layer.SURFACE);
+		}
+		else
+		{
+			diq.setX(0);
+			diq.setY(0);
+			diq.setLayer(Layer.POH);
+		}
+	}
+
+	/** A ring's name for display: the house's ring also names the town its portal is in. */
+	public String displayName(Ring r)
+	{
+		return "DIQ".equals(r.getCode()) && houseTown != null ? r.getName() + " (" + houseTown + ")" : r.getName();
 	}
 
 	public boolean isVisited(String code)

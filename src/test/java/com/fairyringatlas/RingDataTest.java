@@ -408,6 +408,44 @@ public class RingDataTest
 	}
 
 	@Test
+	public void houseRingSitsAtThePortal()
+	{
+		RingRepository repo = real();
+		Ring diq = repo.ring("DIQ");
+		repo.placeHouse(1);
+		assertEquals("Rimmington", repo.getHouseTown());
+		assertTrue(diq.isMapped());
+		assertEquals(Layer.SURFACE, diq.getLayer());
+		assertEquals(2953, diq.getX());
+		assertEquals("Player-owned house (Rimmington)", repo.displayName(diq));
+		// Prifddinas is not on the bundled map: the house card only
+		repo.placeHouse(9);
+		assertEquals("Prifddinas", repo.getHouseTown());
+		assertFalse(diq.isMapped());
+		assertEquals(Layer.POH, diq.getLayer());
+		repo.placeHouse(0);
+		assertNull(repo.getHouseTown());
+		assertFalse(diq.isMapped());
+	}
+
+	@Test
+	public void ringMenuCodes()
+	{
+		assertEquals("CIR", RingMenuNames.codeIn("CIR"));
+		assertEquals("AJR", RingMenuNames.codeIn("Last-destination (AJR)"));
+		assertEquals("AJR", RingMenuNames.codeIn("Ring-last-destination (AJR)"));
+		assertEquals("CKS", RingMenuNames.codeIn("<col=ffffff>CKS</col>"));
+		// renamed already (e.g. by Fairy Ring Favourites), or not a code
+		assertNull(RingMenuNames.codeIn("Mount Karuulm"));
+		assertNull(RingMenuNames.codeIn("Last: Mount Karuulm"));
+		assertNull(RingMenuNames.codeIn("Configure"));
+		assertNull(RingMenuNames.codeIn("AIZ"));
+		assertTrue(RingMenuNames.isRing("<col=00ffff>Fairy ring</col>"));
+		assertTrue(RingMenuNames.isRing("Spiritual Fairy Tree"));
+		assertFalse(RingMenuNames.isRing("<col=00ffff>Mount Karuulm</col>"));
+	}
+
+	@Test
 	public void favouritesListInBlockOrder()
 	{
 		RingRepository repo = real();

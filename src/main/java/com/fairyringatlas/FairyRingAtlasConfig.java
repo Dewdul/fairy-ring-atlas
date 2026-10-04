@@ -146,6 +146,14 @@ public interface FairyRingAtlasConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(keyName = "menuNames", name = "Names in ring menu",
+		description = "Show destination names in a fairy ring's right-click menu: Last-destination and the Favourites codes",
+		section = logSection, position = 2)
+	default boolean menuNames()
+	{
+		return true;
+	}
+
 	@ConfigItem(keyName = "clueHelper", name = "Clue helper",
 		description = "Mark the active clue step on the map and preselect fairy ring clue codes. Needs the core Clue Scroll plugin to be enabled", section = advancedSection, position = 0)
 	default boolean clueHelper()
