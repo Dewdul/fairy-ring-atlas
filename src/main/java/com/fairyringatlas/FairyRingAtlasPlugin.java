@@ -34,7 +34,6 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.events.CanvasSizeChanged;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -503,15 +502,6 @@ public class FairyRingAtlasPlugin extends Plugin
 		if (config.clueHelper())
 		{
 			clue = clueHelper.location();
-		}
-	}
-
-	@Subscribe
-	public void onCanvasSizeChanged(CanvasSizeChanged e)
-	{
-		if (open || modalSlot.holds())
-		{
-			updateSlot();
 		}
 	}
 

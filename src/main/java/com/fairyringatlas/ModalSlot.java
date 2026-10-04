@@ -85,14 +85,24 @@ final class ModalSlot
 			restore(client);
 			return;
 		}
+		// layout values, not drawn bounds: at WidgetLoaded(398) the dials are laid out but not yet
+		// drawn (getBounds() is at -1,-1 until the first frame)
 		boolean fits = fits(slot.getWidthMode(), slot.getHeightMode(), slot.getOriginalWidth(), slot.getOriginalHeight(),
-			slot.getBounds(), dials.getBounds());
+			slot.getWidth(), slot.getHeight(),
+			new Rectangle(dials.getRelativeX(), dials.getRelativeY(), dials.getWidth(), dials.getHeight()));
 		int[] now = position(slot);
 		int[] target = null;
 		if (wanted && fits)
 		{
 			Rectangle box = hud.getBounds();
-			Point corner = box == null ? null : MapLayout.slotCorner(MapLayout.canvas(client), box, slot.getWidth(), slot.getHeight(),
+			Rectangle canvas = MapLayout.canvas(client);
+			if (!laidOut(canvas, box))
+			{
+				// mid-resize (the canvas has changed but the HUD area has not been laid out and
+				// drawn again yet) or a toplevel not drawn yet: keep whatever is there until it has
+				return;
+			}
+			Point corner = MapLayout.slotCorner(canvas, box, slot.getWidth(), slot.getHeight(),
 				MapLayout.obstacles(client), maxW, maxH);
 			target = corner == null ? null : target(box, corner);
 		}
@@ -172,12 +182,28 @@ final class ModalSlot
 		return move && fits && pristine ? Step.MOVE : Step.NOTHING;
 	}
 
-	/** Whether the slot is the size the toplevel gives it, with the dials filling it exactly. */
-	static boolean fits(int widthMode, int heightMode, int width, int height, Rectangle slot, Rectangle dials)
+	/**
+	 * Whether the slot is the size the toplevel gives it, with the dials filling it exactly.
+	 *
+	 * @param width the slot's original (defined) width; {@code slotW} its laid-out width
+	 * @param dials the dials' laid-out position relative to the slot, and size
+	 */
+	static boolean fits(int widthMode, int heightMode, int width, int height, int slotW, int slotH, Rectangle dials)
 	{
 		return widthMode == WidgetSizeMode.ABSOLUTE && heightMode == WidgetSizeMode.ABSOLUTE
-			&& width == SLOT_W && height == SLOT_H
-			&& slot != null && slot.equals(dials);
+			&& width == SLOT_W && height == SLOT_H && slotW == SLOT_W && slotH == SLOT_H
+			&& new Rectangle(0, 0, SLOT_W, SLOT_H).equals(dials);
+	}
+
+	/**
+	 * Whether the container's bounds are usable for placing the slot: drawn, and inside the
+	 * canvas. CanvasSizeChanged is posted before the game lays the HUD area out again, so a
+	 * shrinking window briefly reports the old, larger HUD area, and offsets measured from it
+	 * would put the dials off screen.
+	 */
+	static boolean laidOut(Rectangle canvas, Rectangle hud)
+	{
+		return hud != null && hud.width > 0 && hud.height > 0 && canvas.contains(hud);
 	}
 
 	/** Whether the slot's position fields are still the ones we wrote. */

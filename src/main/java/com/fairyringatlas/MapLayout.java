@@ -61,14 +61,18 @@ public final class MapLayout
 		return new Rectangle(0, 0, client.getCanvasWidth(), client.getCanvasHeight());
 	}
 
-	/** The live bounds of everything the map keeps clear of: the chatbox, the side panel and the travel log. */
+	/**
+	 * The live bounds of everything the map keeps clear of: the chatbox, the side panel and the
+	 * travel log. A widget not drawn yet (the travel log loaded in the same batch as the dials) has
+	 * no place on screen yet and is left out rather than taken as sitting at the top-left.
+	 */
 	static List<Rectangle> obstacles(Client client)
 	{
 		List<Rectangle> obstacles = new ArrayList<>();
 		for (int id : OBSTACLES)
 		{
 			Rectangle r = bounds(client, id);
-			if (r != null)
+			if (r != null && !(r.x == -1 && r.y == -1))
 			{
 				obstacles.add(r);
 			}

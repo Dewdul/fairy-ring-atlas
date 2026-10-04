@@ -21,7 +21,7 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 
 ## How to use it
 
-1. Use a fairy ring. The map opens over the dials, centred on the ring you are standing at. In resizable mode it fills the free space above the chatbox and left of the side panel. The real **Teleport** and close buttons sit in the map's bottom-right corner. Teleport is greyed out until the dials show your chosen ring, so you can't teleport somewhere else by mistake.
+1. Use a fairy ring. The map opens over the dials, centred on the ring you are standing at. In resizable mode it fills the free space above the chatbox and left of the side panel, up to the Max width and height, and is centred in that space beyond them. The real **Teleport** and close buttons sit in the map's bottom-right corner. Teleport is greyed out until the dials show your chosen ring, so you can't teleport somewhere else by mistake.
 2. **Click a ring** to select it. The greyed-out Teleport now reads *Teleport to* its code, and it and the card tell you the next step:
    - **The ring is in your travel log.** The log is narrowed to that code and its row is highlighted. Click the row (*Use code*), then click **Teleport**. If you click a row in the log yourself, the map follows and the log is left as it is.
    - **The ring is not in your travel log yet.** Click **Show dials**. Arrows on the real dials show which way to turn each one and how many times. Turn the dials, then click **Teleport**. The **Map** button takes you back to the map.
@@ -44,7 +44,7 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 |---|---|---|---|
 | Map | Open as map | on | Start with the map rather than the dials |
 | | Use free space | on | In resizable mode, move the fairy ring interface into the corner of the free screen space while the map shows, so the map can fill it (see the notes) |
-| | Max width / Max height | 2000 / 1400 | Largest map size in resizable mode. A smaller map is centred in the free space |
+| | Max width / Max height | 2000 / 1400 | Largest map size in resizable mode. With Use free space, a smaller map is centred in the free space |
 | | Open at | Around you | Centre on the ring you are standing at (*Around you*), *Fit all* rings, or *Remember* the last view this session |
 | | Place names / Map icons | on | World map place names, and icons when zoomed in |
 | | Fit to search | on | Zoom to the rings that match the travel log search |
@@ -58,7 +58,7 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 ## Notes
 
 - **Stretched mode.** The map is drawn at the game's own resolution and then stretched along with the rest of the game. It can't be sharper than the game itself.
-- **Use free space.** The game centres the fairy ring interface, and the map grows from its bottom-right corner, where Teleport sits. To let the map fill the screen, the plugin moves that interface's place on screen (never its size) into the corner of the free space while the map shows, and puts it back exactly when you switch to the dials, close the ring, log out or hop. It leaves the place alone if the game or another plugin (such as Fixed Resizable Hybrid) has already changed it. If it clashes with another layout plugin, turn the option off.
+- **Use free space.** The game centres the fairy ring interface, and the map grows from its bottom-right corner, where Teleport sits. To let the map fill the screen, the plugin moves that interface's place on screen (never its size) into the corner of the free space while the map shows, and puts it back exactly when you switch to the dials, close the ring, log out or hop. It leaves the place alone if the game or another plugin has already changed it. With Fixed Resizable Hybrid, the interface is moved within that plugin's wider play area. If it clashes with another layout plugin, turn the option off.
 - **Fixed mode.** The map fills the dial area. The side panel (*Favourites* and *Elsewhere*) starts collapsed, and you can open it with its tab.
 - **Fairy Ring Map.** That plugin also draws over the dials, so the two are marked as conflicting: RuneLite offers to turn the other off when you enable one. If both are on anyway, the map shows a notice asking you to turn one of them off.
 - **Memory.** About 30 seconds after you close the fairy ring, the plugin frees its decoded map tiles and image buffers.

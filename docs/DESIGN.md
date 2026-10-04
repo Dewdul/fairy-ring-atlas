@@ -1135,19 +1135,32 @@ The size is never written. No script is run.
   container is `HUD_CONTAINER_FRONT` (10551311 / 10747919). The fixed slot (`Toplevel.MAINMODAL`)
   and the other toplevels' slots are never touched.
 - Anchoring to the right and bottom means the game keeps the corner across window resizes by
-  itself, and a modal opened into a slot we somehow failed to restore still opens fully on
-  screen (a full-height one, such as the bank, loses only the ~6 px offset at the top).
-  `setForcedPosition` or a centred offset would push such a modal about 290 px off screen.
+  itself, and a 512x334 modal opened into a slot we somehow failed to restore still opens on
+  screen. A full-size one (the bank, with `%toplevel_mainmodal_bg_trans` -2/-3) loses the
+  actual offsets: about 6 px when the map is uncapped, but hundreds of px when a size cap
+  centres the map (with the 2000x1400 caps, offsets of 155 and 6 px on a 2560x1440 canvas,
+  795 and 298 px on 3840x2160). `setForcedPosition` or a centred offset would be worse still.
 - `MapLayout.slotCorner` reuses `compute`'s four-way obstacle cut on the container inset by
-  6 px. It returns no corner when the dials do not fit or the gain is under 8 px, which also
-  makes it step aside when another plugin has resized the HUD area.
+  6 px. It returns no corner when the dials do not fit or the gain is under 8 px. A plugin that
+  widens the HUD area (Fixed Resizable Hybrid sets `HUD_CONTAINER_FRONT`'s width from 250 to
+  0) does not make it step aside: the slot is then moved inside the widened area.
+- Obstacles not drawn yet (bounds at -1,-1, such as the travel log loaded in the same packet
+  batch as the dials) are left out; the per-tick recompute takes them in once drawn.
 
 **Guards.**
 - *Pristine:* the slot is moved only from its interface definition's state: both position
-  modes `ABSOLUTE_CENTER`, both offsets 0, both size modes `ABSOLUTE`, 512x334, and the dials'
-  bounds equal to the slot's. This skips a slot left full-height by a modal that set
-  `%toplevel_mainmodal_bg_trans` to -2/-3, and one held by another plugin (Fixed Resizable
-  Hybrid changes its y mode and height).
+  modes `ABSOLUTE_CENTER`, both offsets 0, both size modes `ABSOLUTE`, 512x334 (defined and laid
+  out), and the dials laid out at 0,0 in it at the same size. These are layout values
+  (`getRelativeX/Y`, `getWidth/Height`), never drawn bounds: a reopened 398 is a new widget
+  whose `getBounds()` is at -1,-1 until its first frame, so a drawn-bounds check failed at
+  `WidgetLoaded` and the move waited for a tick, a visible jump on every open. This skips a slot
+  left full-height by a modal that set `%toplevel_mainmodal_bg_trans` to -2/-3, and one another
+  plugin has moved or resized (Fixed Resizable Hybrid does so only for the bank).
+- *Laid out:* the slot is placed only while its container's bounds are drawn and inside the
+  canvas. `CanvasSizeChanged` is posted from the canvas width and height field writes, before
+  `toplevel_resize` lays the HUD area out again; offsets measured from the old, larger HUD area
+  while the window shrinks would put the dials and the map off screen. Until the new layout is
+  drawn the slot keeps its last place (its right/bottom anchoring follows the resize).
 - *Ours:* the slot is written again, or restored, only while its four position fields are
   exactly what we wrote. If anything changed them since, the record is dropped without writing.
   There is no start-up scan that resets slots we never touched.
@@ -1159,8 +1172,9 @@ block; the dials' parent no longer being the held slot (toplevel switch, `Resize
 a `WidgetLoaded` of any other group while a record is held, before that interface's first frame;
 the option turned off; no worthwhile corner any more. A slot that is no longer the live widget
 for its id (left behind by a toplevel switch or logout) gets its fields written back but is not
-revalidated. The corner is recomputed on `GameTick`, `CanvasSizeChanged` and config changes,
-and written only when it changes.
+revalidated. The corner is recomputed on `GameTick` and config changes, and written only when
+it changes. Not on `CanvasSizeChanged`: the bounds are stale then (see *Laid out*), and the
+anchoring already keeps the corner through the resize until the next tick.
 
 **Evidence** (research and critique, 2026-10-03):
 - *No desktop game script positions MAINMODAL.* `toplevel_resize` (909), run from
@@ -1169,12 +1183,15 @@ and written only when it changes.
   A position we set therefore survives resizes, and the game re-aligns from our values.
 - *Order of events.* `openInterface` closes the old interface first, and `WidgetClosed` is
   posted before the close, so a restore lands before the next modal mounts. `WidgetLoaded` is
-  posted before the first draw, so the move causes no one-frame jump. The dials' children are
+  posted before the first draw (after `revalidateWidgetScroll`, so layout values are already
+  valid), so the move, checked on layout values, causes no one-frame jump. The dials' children are
   positioned relative to the slot and need no re-layout.
 - *Precedent.* Core RuneLite's `WidgetOverlay` lets players drag `CHAT_CONTAINER`, `SIDE_MENU`,
   `SIDE_CONTAINER` and `MAP_CONTAINER` with `setForcedPosition`, and the interfaces in them
   draw and click normally. Fixed Resizable Hybrid (Plugin Hub, plugin-hub #16219) writes
-  `ToplevelOsrsStretch.MAINMODAL`'s y mode, `originalY` and height and restores them. Better
+  `ToplevelOsrsStretch.MAINMODAL`'s y mode, `originalY` and height for the bank only
+  (`expandBank` / `resetBankExpansion`) and restores them; with the dials open it leaves the slot
+  pristine, so we move it inside FRH's widened HUD area. Better
   Resizable Chat (plugin-hub #12663) re-aligns mounted modals. Jagex's guidelines restrict
   moving click zones only for 3D components, combat options, the inventory, equipment and
   spellbook, and resizing on the prayer book; MAINMODAL is none of these.
@@ -1186,10 +1203,13 @@ each default in the profile on first start and the old keys would keep 1100x720 
 already ran the plugin. Base-map memory at the full size stays inside the `TileStore` budget
 (4.8 already allows for 2000x1400). The preview `8-free-space.png` renders a 1738x905 map.
 
+- *The dimmed modal background.* 398 gets it: FRH lists 398 in `WIDGETS_WITH_BACKGROUNDS`.
+  `toplevel_mainmodal_bg_calculate` (910) builds its bands around a centred 512x334 hole, so
+  without FRH they stay centred while the slot is moved; FRH rebuilds them from MAINMODAL's
+  relative position before the first render after load and on chat changes. The opaque map
+  covers them except inside the Teleport and close holes.
+
 **Not verified without the game** (test in game):
-- whether 398 gets the dimmed modal background: `toplevel_mainmodal_bg_calculate` (910) builds
-  its bands around a centred 512x334 hole, so they would be misplaced while moved. The opaque
-  map covers them except inside the Teleport and close holes;
 - classic and modern layouts, each narrow and wide; alt-dragging the chatbox and side panel;
 - switching layout, logging out and hopping with the dials open; toggling a favourite (398
   closes and reopens within about 2 ticks);

@@ -162,16 +162,29 @@ public class ModalSlotTest
 	@Test
 	public void fitsOnlyTheDefinedSlotFilledByTheDials()
 	{
-		Rectangle r = new Rectangle(419, 200, 512, 334);
-		assertTrue(ModalSlot.fits(WidgetSizeMode.ABSOLUTE, WidgetSizeMode.ABSOLUTE, 512, 334, r, new Rectangle(r)));
+		int a = WidgetSizeMode.ABSOLUTE;
+		Rectangle filled = new Rectangle(0, 0, 512, 334);
+		assertTrue(ModalSlot.fits(a, a, 512, 334, 512, 334, filled));
 		// a modal that sized the slot to its parent (toplevel_mainmodal_bg_trans -2/-3)
-		assertFalse(ModalSlot.fits(WidgetSizeMode.MINUS, WidgetSizeMode.ABSOLUTE, 512, 334, r, r));
-		assertFalse(ModalSlot.fits(WidgetSizeMode.ABSOLUTE, WidgetSizeMode.MINUS, 512, 334, r, r));
+		assertFalse(ModalSlot.fits(WidgetSizeMode.MINUS, a, 512, 334, 1350, 334, filled));
+		assertFalse(ModalSlot.fits(a, WidgetSizeMode.MINUS, 512, 334, 512, 735, filled));
 		// another plugin resized it
-		assertFalse(ModalSlot.fits(WidgetSizeMode.ABSOLUTE, WidgetSizeMode.ABSOLUTE, 512, 500, r, r));
+		assertFalse(ModalSlot.fits(a, a, 512, 500, 512, 500, filled));
+		assertFalse(ModalSlot.fits(a, a, 512, 334, 512, 500, filled));
 		// the dials are not exactly the slot
-		assertFalse(ModalSlot.fits(WidgetSizeMode.ABSOLUTE, WidgetSizeMode.ABSOLUTE, 512, 334, r, new Rectangle(420, 200, 512, 334)));
-		assertFalse(ModalSlot.fits(WidgetSizeMode.ABSOLUTE, WidgetSizeMode.ABSOLUTE, 512, 334, null, r));
+		assertFalse(ModalSlot.fits(a, a, 512, 334, 512, 334, new Rectangle(1, 0, 512, 334)));
+		assertFalse(ModalSlot.fits(a, a, 512, 334, 512, 334, new Rectangle(0, 0, 0, 0)));
+	}
+
+	@Test
+	public void layoutMustBeDrawnAndInsideTheCanvas()
+	{
+		assertTrue(ModalSlot.laidOut(CANVAS, HUD));
+		// a new toplevel not drawn yet
+		assertFalse(ModalSlot.laidOut(CANVAS, new Rectangle(-1, -1, 1350, 735)));
+		// mid-shrink: the canvas is new, the HUD area still the old, larger one
+		assertFalse(ModalSlot.laidOut(new Rectangle(0, 0, 1280, 720), new Rectangle(0, 0, 1750, 917)));
+		assertFalse(ModalSlot.laidOut(CANVAS, null));
 	}
 
 	@Test
@@ -267,6 +280,9 @@ public class ModalSlotTest
 	private Widget dials;
 	private Client client;
 	private ModalSlot modal;
+	private Rectangle canvas = new Rectangle(CANVAS);
+	/** The dials' drawn bounds as the game reports them before their first frame, when set. */
+	private Rectangle dialsDrawn;
 
 	private Widget proxy(Fake f)
 	{
@@ -354,7 +370,18 @@ public class ModalSlotTest
 				case "getParent":
 					return dialsMountedIn == null ? null : dialsMountedIn.proxy;
 				case "getBounds":
+					if (dialsDrawn != null)
+					{
+						return new Rectangle(dialsDrawn);
+					}
 					return dialsMountedIn == null ? null : new Rectangle(dialsMountedIn.bounds);
+				case "getRelativeX":
+				case "getRelativeY":
+					return 0;
+				case "getWidth":
+					return dialsMountedIn == null ? 0 : dialsMountedIn.w;
+				case "getHeight":
+					return dialsMountedIn == null ? 0 : dialsMountedIn.h;
 				case "isHidden":
 					return false;
 				case "equals":
@@ -377,9 +404,9 @@ public class ModalSlotTest
 					Fake f = args.length == 1 ? live.get((int) args[0]) : null;
 					return f == null ? null : f.proxy;
 				case "getCanvasWidth":
-					return CANVAS.width;
+					return canvas.width;
 				case "getCanvasHeight":
-					return CANVAS.height;
+					return canvas.height;
 				case "isResized":
 					return true;
 				case "equals":
@@ -413,6 +440,51 @@ public class ModalSlotTest
 		assertArrayEquals(PRISTINE, slot.position());
 		assertEquals(new Rectangle(419, 200, 512, 334), slot.bounds);
 		assertEquals(2, slot.revalidations);
+	}
+
+	@Test
+	public void movesAtWidgetLoadedBeforeTheDialsAreDrawn()
+	{
+		// a reopened 398 is a new widget: laid out but not drawn, so its bounds are at -1,-1
+		dialsDrawn = new Rectangle(-1, -1, 512, 334);
+		modal.update(client, true, 2000, 1400);
+		assertTrue(modal.holds());
+		assertArrayEquals(new int[]{WidgetPositionMode.ABSOLUTE_RIGHT, WidgetPositionMode.ABSOLUTE_BOTTOM, 6, 6}, slot.position());
+	}
+
+	@Test
+	public void aTravelLogNotDrawnYetIsNoObstacle()
+	{
+		// loaded in the same batch as the dials: laid out, but its drawn bounds are still -1,-1
+		Fake log = new Fake(InterfaceID.FairyringsLog.UNIVERSE);
+		log.bounds = new Rectangle(-1, -1, 200, 300);
+		proxy(log);
+		live.put(log.id, log);
+		modal.update(client, true, 1100, 720);
+		assertArrayEquals(ModalSlot.target(HUD, MapLayout.slotCorner(CANVAS, HUD, 512, 334, Collections.emptyList(), 1100, 720)), slot.position());
+		// once drawn it is one
+		log.bounds = new Rectangle(6, 6, 200, 300);
+		modal.update(client, true, 1100, 720);
+		assertArrayEquals(ModalSlot.target(HUD, MapLayout.slotCorner(CANVAS, HUD, 512, 334,
+			Collections.singletonList(new Rectangle(6, 6, 200, 300)), 1100, 720)), slot.position());
+	}
+
+	@Test
+	public void keepsTheSlotWhileTheWindowShrinksUntilTheHudIsLaidOutAgain()
+	{
+		modal.update(client, true, 2000, 1400);
+		int[] moved = slot.position();
+		int revalidated = slot.revalidations;
+		// CanvasSizeChanged / a tick in between: new canvas, old HUD bounds
+		canvas = new Rectangle(0, 0, 1000, 600);
+		modal.update(client, true, 2000, 1400);
+		assertTrue(modal.holds());
+		assertArrayEquals(moved, slot.position());
+		assertEquals(revalidated, slot.revalidations);
+		// still restored when no longer wanted
+		modal.update(client, false, 2000, 1400);
+		assertFalse(modal.holds());
+		assertArrayEquals(PRISTINE, slot.position());
 	}
 
 	@Test
