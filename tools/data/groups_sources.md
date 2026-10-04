@@ -1,0 +1,85 @@
+# Quick-click group sources
+
+Sources for `src/main/resources/com/fairyringatlas/groups.json`, the built-in
+*Slayer* and *Farming* groups. Every code is a dialable code in `rings.json`.
+Each group is in suggested order: most useful first for Slayer, run order for
+Farming. Notes are optional display hints of at most 40 printable ASCII
+characters.
+
+The OSRS Wiki was read via `?action=raw` on 2026-10-03. Ring tiles are the
+`rings.json` landing tiles. Patch tiles are the wiki's `{{Map}}` pins on the
+`*/Patches` transclusions of `Farming/Patch_locations`. Distances are tile
+offsets from the ring's landing tile to the pin.
+
+## Slayer
+
+| # | Code | Note | Source |
+|---|---|---|---|
+| 1 | CKS | Slayer Tower; Mazchna in Canifis | `Slayer_Tower`: "CKS lands you in the west of Canifis, just south of the tower". `Slayer_Master` (Mazchna/Achtryn): "CKS, arriving west of Canifis". `Chaeldar` (Fairy rings section) names CKS for Slayer Tower tasks. |
+| 2 | AJR | Kurasks, turoths, basilisks and more | `Fremennik_Slayer_Dungeon` (transportation: AJR). `Kurask` infobox location: Fremennik Slayer Dungeon (AJR). `Chaeldar` names AJR. Monster list from the `rings.json` AJR POIs. |
+| 3 | CIR | Konar; Karuulm Slayer Dungeon | `Slayer_Master` (Konar quo Maten): summit of Mount Karuulm, "CIR, arriving south of Mount Karuulm". `Konar_quo_Maten`: "Heading north of the CIR fairy ring". `Karuulm_Slayer_Dungeon`: the mountain is a short walk north of CIR. |
+| 4 | BKS | Chaeldar (Zanaris) | `Slayer_Master` (Chaeldar): in Zanaris by the Fairy Queen's throne; reached by any fairy ring to Zanaris or the Lumbridge Swamp shed. BKS is the Zanaris code in `rings.json`. |
+| 5 | BIQ | Kalphite Lair and Kalphite Cave | `Kalphite_Lair`: BIQ, then run north-west. `Kalphite_Cave`: BIQ, then run north-east (Slayer-only cave). |
+| 6 | BKP | Smoke Devil Dungeon | `Smoke_Devil_Dungeon`: BKP brings players just south-west of the dungeon. `Smoke_devil`: quick access via BKP. |
+| 7 | DJR | Chasm of Fire demons; lizardman shamans | `Chasm_of_Fire`: DJR lands just south-east of the Chasm; monsters are lesser, greater and black demons. `Lizardman_Canyon`: the easiest way there is DJR. `Lizardman_shaman`: DJR is just south of Lizardman Canyon. |
+| 8 | AKQ | Kraken Cove: cave kraken, Kraken boss | `Kraken_Cove`: AKQ brings players just east of the Cove. `Cave_kraken` location: Kraken Cove. |
+| 9 | DIP | Abyssal Sire (Abyssal Nexus) | `Abyssal_Nexus` (teleport: DIP; safe route without the Wilderness). `Abyssal_Sire`: "may be reached quickly using fairy ring DIP". |
+| 10 | AIQ | Skeletal wyverns (Ice Dungeon); mogres | `Asgarnian_Ice_Dungeon`: trapdoor north of Mudskipper Point, AIQ. `Skeletal_Wyvern` location: Asgarnian Ice Dungeon (AIQ). `Mogre` location: Mudskipper Point (AIQ). |
+| 11 | ALP | Dagannoths under the Lighthouse | `Dagannoth`: they live in the Lighthouse basement, close to ALP, after Horror from the Deep. `Lighthouse`: the fastest way there is ALP. |
+| 12 | BJS | Zulrah (76 Agility to cross) | `Zulrah`: BJS to the island west of Zul-Andra, then the stepping stones (76 Agility, boostable). Matches the `rings.json` BJS requirement line. |
+| 13 | ALQ | Morytania Spider Cave (araxytes) | `Morytania_Spider_Cave`: ectophial or ALQ, then run south past the small bridge. `Araxyte`: 92 Slayer; the only location is the Morytania Spider Cave. |
+| 14 | DKR | Krystilia; Edgeville Dungeon | `Slayer_Master` (Krystilia): by the Edgeville jailhouse, "DKR, and run west over the river". `Slayer_Master` (Vannaka, who is in Edgeville Dungeon): "DKR, arriving east of Edgeville". `Krystilia`: Edgeville via DKR. |
+
+### Considered and left out
+
+- **Nieve/Steve** (Tree Gnome Stronghold). No ring is near. The wiki's routes
+  are slayer ring, necklace of passage, balloon, spirit tree and glider.
+- **Duradel** (Shilo Village, CKR). The wiki lists CKR last, after Karamja
+  gloves 4/3 and the cart. The walk goes round by the Kharazi Jungle
+  (`Duradel`), so the ring is not the usual route.
+- **Catacombs of Kourend.** DJR and CIS reach the Reeking Cove and Demon's Run
+  exits only after the player has used them once (`Catacombs_of_Kourend`).
+  DJR is already in the group.
+- **Brimhaven Dungeon** (CKR, `Brimhaven_Dungeon`). The wiki lists it after the
+  house portal, Tai Bwo Wannai scroll, spirit tree and glory routes.
+- **Stronghold Slayer Cave** has no nearby ring; the slayer ring goes there.
+- **Mortimer** (Wyrmscraig Cavern). `Slayer_Master` lists no ring route.
+- **Isle of Souls Dungeon** (BJP), **Brine Rat Cavern** (DKS) and **TzHaar**
+  (BLP) are real ring routes (`Isle_of_Souls_Dungeon`, `Brine_Rat_Cavern`,
+  `Mor_Ul_Rek`). They were cut to keep the group at 14 entries. Players can
+  add them.
+
+## Farming
+
+Order: herb run (wiki *Farming runs* herb run sequence, ring stops only), then
+tree, fruit tree and calquat, then special, hops and bush patches.
+
+| # | Code | Note | Patch tile, distance from ring | Source |
+|---|---|---|---|---|
+| 1 | ALQ | Port Phasmatys herb patch (north) | 3602,3526; 31 N | `Farming_runs` herb run: "Use the fairy ring ALQ and run north". `Allotment_patch/Patches` lists ALQ. |
+| 2 | BLR | Ardougne herb patch (north-west) | 2667,3375; 73 W, 24 N | `Allotment_patch/Patches` (north of Ardougne) lists BLR among its closest teleports. |
+| 3 | AKR | Hosidius herb patch (west); vinery | 1735,3555; 91 W. Vinery 1808,3556 | `Allotment_patch/Patches`: "AKR to Hosidius Vinery, then run west". `Farming_runs` herb run lists AKR. `Special_patches/Patches` (grape) lists AKR first. |
+| 4 | CIR | Farming Guild: herbs, trees, Hespori | Herb 1239,3727; 63 W, 35 S | `Farming_runs` (herb, tree, bush runs): "CIR and run south-west". `Allotment_patch/Patches`, `Tree_patch/Patches`, `Fruit_tree_patch/Patches`, `Bush_patch/Patches`, `Spirit_Tree_(Farming)/Patches` and `Special_patches/Patches` (Hespori, anima, celastrus, redwood) all list CIR. |
+| 5 | AJP | Ortus Farm herbs (NW); hardwood (SE) | Ortus 1586,3099; 65 W, 89 N. Locus Oasis 1687,2972; 36 E, 38 S | `Farming_runs` herb run: "AJP and run north-west". Hardwood run: "AJP and run south-east to the patch". `Special_patches/Patches` (Locus Oasis hardwood, after The Ribbiting Tale of a Lily Pad Labour Dispute). |
+| 6 | AIS | Nemus tree patch; belladonna patch | Nemus 1366,3321; 63 W. Belladonna 1450,3354; 30 N | `Tree_patch/Patches` and `Farming_runs` tree run: AIS, then south-west, cross the river, north-west. `Special_patches/Patches` (Auburnvale belladonna): "AIS, then run north". |
+| 7 | CIQ | Gnome Village fruit tree; Yanille hops | Fruit 2490,3180; 38 W, 53 N. Hops 2576,3105; 48 E, 22 S | `Fruit_tree_patch/Patches` (west of the Tree Gnome maze) lists CIQ. `Hops_patch/Patches` (Yanille) lists CIQ. `Farming_runs` hop run: "CIQ and run south-east". |
+| 8 | CKR | Tai Bwo Wannai calquat (north) | 2796,3101; 98 N | `Special_patches/Patches` (calquat north of Tai Bwo Wannai) lists CKR. |
+| 9 | CJQ | Summer Shore calquat; coral nursery | Calquat 3128,2405; 50 W, 42 S | `Special_patches/Patches`: Summer Shore calquat, "CJQ then run south-west". `Special_patches/Patches` (coral nursery, after Troubled Tortugans) lists CJQ as its teleport. `Farming_runs` fruit tree run: "CJQ and run south (50 Agility) and then west". |
+| 10 | CKS | Mushroom patch beside the ring | 3452,3473; 5 | `Special_patches/Patches` (mushroom, west of Canifis) lists CKS first. |
+| 11 | ALS | McGrubor's Wood hops patch (north) | 2667,3526; 23 E, 31 N | `Hops_patch/Patches` lists ALS. `Farming_runs` hop run: "ALS and run north". |
+| 12 | CKQ | Aldarin hops patch | 1365,2939; 6 | `Hops_patch/Patches` (Aldarin) lists CKQ. `Farming_runs` hop run lists CKQ. |
+| 13 | DJP | Bush patch south of Ardougne (west) | 2618,3226; 40 W | `Bush_patch/Patches` (south of Ardougne) lists DJP. `Farming_runs` hop and bush run: "DJP and run west". |
+| 14 | CIP | Etceteria bush and spirit tree (east) | Bush 2592,3864; 79 E. Spirit tree 2613,3858; 100 E | `Bush_patch/Patches` and `Spirit_Tree_(Farming)/Patches` (Etceteria) list CIP. `Farming_runs` bush run: "CIP and run east". |
+
+### Considered and left out
+
+- **Weiss herb patch** (DKS, then Larry's boat). It is listed by the wiki, but
+  the boat ride makes it slow. Players with Making Friends with My Arm usually
+  have the icy basalt.
+- **Brimhaven fruit tree** (BJR, then a magic whistle). The wiki lists it last,
+  and it needs Holy Grail and a whistle.
+- **Tree Gnome Stronghold, Lletya, Catherby, Falador, Taverley, Lumbridge,
+  Varrock, Kastori, Prifddinas, Troll Stronghold and Harmony Island** have no
+  ring among their listed closest teleports.
+- **Tithe Farm** is a minigame, not a patch. AKR is already in the group for
+  the vinery.

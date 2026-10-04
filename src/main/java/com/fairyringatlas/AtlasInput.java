@@ -29,9 +29,13 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	private final FairyRingAtlasPlugin plugin;
 	private volatile boolean dragging;
 	private volatile boolean swallow;
-	/** The favourite row the press landed on (a click selects it, a drag reorders the list). */
-	private volatile String faveCode;
-	private volatile boolean faveDragging;
+	/**
+	 * The row the press landed on in a list the player can reorder (Favourites or a group), and
+	 * its ring: a click selects it, a drag moves it.
+	 */
+	private volatile String rowList;
+	private volatile String rowCode;
+	private volatile boolean rowDragging;
 	private int pressX;
 	private int pressY;
 	private int lastX;
@@ -52,7 +56,11 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
 		double rotation = e.getPreciseWheelRotation();
-		if (hit != null && (hit.getKind() == Hit.Kind.PANEL || hit.getKind() == Hit.Kind.CARD
+		if (plugin.inGroups(e.getX(), e.getY()))
+		{
+			plugin.scrollGroups((int) Math.round(rotation * 24));
+		}
+		else if (hit != null && (hit.getKind() == Hit.Kind.PANEL || hit.getKind() == Hit.Kind.CARD
 			|| (hit.getKind() == Hit.Kind.CHIP && plugin.inPanel(e.getX(), e.getY()))))
 		{
 			plugin.scrollPanel((int) Math.round(rotation * 24));
@@ -75,11 +83,12 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			return e;
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
-		if (hit != null && hit.getKind() == Hit.Kind.CHIP && Hit.FAVE.equals(hit.getId()) && hit.getRing() != null)
+		if (hit != null && hit.isDraggableRow())
 		{
-			// a favourite row: click or drag is only known on release, so the press stays with us
-			faveCode = hit.getRing().getCode();
-			faveDragging = false;
+			// a favourite's or a group's row: click or drag is only known on release, so the press stays with us
+			rowList = hit.getId();
+			rowCode = hit.getRing().getCode();
+			rowDragging = false;
 			pressX = e.getX();
 			pressY = e.getY();
 			swallow = true;
@@ -105,16 +114,16 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseDragged(MouseEvent e)
 	{
-		String code = faveCode;
+		String code = rowCode;
 		if (code != null)
 		{
-			if (!faveDragging && Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) > 4)
+			if (!rowDragging && Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) > 4)
 			{
-				faveDragging = true;
+				rowDragging = true;
 			}
-			if (faveDragging)
+			if (rowDragging)
 			{
-				plugin.faveDrag(code, e.getY());
+				plugin.rowDrag(rowList, code, e.getY());
 			}
 			// not consumed, as for a pan
 			return e;
@@ -133,19 +142,19 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseReleased(MouseEvent e)
 	{
-		String code = faveCode;
+		String code = rowCode;
 		if (code != null)
 		{
-			faveCode = null;
-			if (faveDragging)
+			rowCode = null;
+			if (rowDragging)
 			{
-				plugin.faveDrop(code, e.getY());
+				plugin.rowDrop(rowList, code, e.getY());
 			}
 			else
 			{
-				plugin.faveClick(code);
+				plugin.rowClick(code);
 			}
-			faveDragging = false;
+			rowDragging = false;
 		}
 		if (dragging || swallow)
 		{
@@ -170,7 +179,7 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	{
 		dragging = false;
 		swallow = false;
-		faveCode = null;
-		faveDragging = false;
+		rowCode = null;
+		rowDragging = false;
 	}
 }

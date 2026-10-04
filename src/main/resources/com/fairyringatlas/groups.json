@@ -1,0 +1,44 @@
+{
+  "groups": [
+    {
+      "id": "slayer",
+      "name": "Slayer",
+      "codes": [
+        {"code": "CKS", "note": "Slayer Tower; Mazchna in Canifis"},
+        {"code": "AJR", "note": "Kurasks, turoths, basilisks and more"},
+        {"code": "CIR", "note": "Konar; Karuulm Slayer Dungeon"},
+        {"code": "BKS", "note": "Chaeldar (Zanaris)"},
+        {"code": "BIQ", "note": "Kalphite Lair and Kalphite Cave"},
+        {"code": "BKP", "note": "Smoke Devil Dungeon"},
+        {"code": "DJR", "note": "Chasm of Fire demons; lizardman shamans"},
+        {"code": "AKQ", "note": "Kraken Cove: cave kraken, Kraken boss"},
+        {"code": "DIP", "note": "Abyssal Sire (Abyssal Nexus)"},
+        {"code": "AIQ", "note": "Skeletal wyverns (Ice Dungeon); mogres"},
+        {"code": "ALP", "note": "Dagannoths under the Lighthouse"},
+        {"code": "BJS", "note": "Zulrah (76 Agility to cross)"},
+        {"code": "ALQ", "note": "Morytania Spider Cave (araxytes)"},
+        {"code": "DKR", "note": "Krystilia; Edgeville Dungeon"}
+      ]
+    },
+    {
+      "id": "farming",
+      "name": "Farming",
+      "codes": [
+        {"code": "ALQ", "note": "Port Phasmatys herb patch (north)"},
+        {"code": "BLR", "note": "Ardougne herb patch (north-west)"},
+        {"code": "AKR", "note": "Hosidius herb patch (west); vinery"},
+        {"code": "CIR", "note": "Farming Guild: herbs, trees, Hespori"},
+        {"code": "AJP", "note": "Ortus Farm herbs (NW); hardwood (SE)"},
+        {"code": "AIS", "note": "Nemus tree patch; belladonna patch"},
+        {"code": "CIQ", "note": "Gnome Village fruit tree; Yanille hops"},
+        {"code": "CKR", "note": "Tai Bwo Wannai calquat (north)"},
+        {"code": "CJQ", "note": "Summer Shore calquat; coral nursery"},
+        {"code": "CKS", "note": "Mushroom patch beside the ring"},
+        {"code": "ALS", "note": "McGrubor's Wood hops patch (north)"},
+        {"code": "CKQ", "note": "Aldarin hops patch"},
+        {"code": "DJP", "note": "Bush patch south of Ardougne (west)"},
+        {"code": "CIP", "note": "Etceteria bush and spirit tree (east)"}
+      ]
+    }
+  ]
+}

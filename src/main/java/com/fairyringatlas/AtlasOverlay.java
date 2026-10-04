@@ -114,6 +114,7 @@ public class AtlasOverlay extends Overlay
 		if (plugin.getMode() == FairyRingAtlasPlugin.Mode.DIAL)
 		{
 			renderDialMode(g, selected, ready);
+			plugin.publishGroups(null, 0);
 			if (row != null)
 			{
 				paintRowHighlight(g, row, null, java.util.Collections.emptyList(), config.selectedColor(), scene.now);
@@ -174,6 +175,7 @@ public class AtlasOverlay extends Overlay
 			paintRowHighlight(g, row, from, scene.blockers(), config.selectedColor(), scene.now);
 		}
 		plugin.publish(new ArrayList<>(scene.hits), holes, scene.panel, chrome.panelScrollMax, null);
+		plugin.publishGroups(scene.groupsPanel, chrome.groupsScrollMax);
 		return null;
 	}
 
@@ -190,8 +192,12 @@ public class AtlasOverlay extends Overlay
 		s.panelCollapsed = plugin.isPanelCollapsed(v.getW());
 		s.panelScroll = plugin.getPanelScroll();
 		s.faveOrder = plugin.getFaveOrder();
-		s.dragFave = plugin.getDragFave();
+		s.dragList = plugin.getDragList();
+		s.dragCode = plugin.getDragCode();
 		s.dragY = plugin.getDragY();
+		s.groupsOpen = plugin.isGroupsOpen();
+		s.groups = plugin.getGroupsView();
+		s.groupsScroll = plugin.getGroupsScroll();
 		WorldPoint clue = config.clueHelper() ? plugin.getClue() : null;
 		s.clueX = clue == null ? Double.NaN : clue.getX();
 		s.clueY = clue == null ? Double.NaN : clue.getY();
@@ -211,6 +217,7 @@ public class AtlasOverlay extends Overlay
 			Hit hover = plugin.isMapInput(mp.getX(), mp.getY()) ? plugin.hitAt(mp.getX(), mp.getY()) : null;
 			s.hovered = hover != null && (hover.getKind() == Hit.Kind.MARKER || hover.getKind() == Hit.Kind.CHIP
 				|| hover.getKind() == Hit.Kind.CARD) ? hover.getRing() : null;
+			s.hoveredNote = s.hovered == null ? null : plugin.groupNote(hover.getId(), s.hovered.getCode());
 		}
 		if (!plugin.isMapInput(mp.getX(), mp.getY()))
 		{

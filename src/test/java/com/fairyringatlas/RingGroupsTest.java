@@ -1,0 +1,204 @@
+/*
+ * Copyright (c) 2026, Dewdul
+ * All rights reserved.
+ * Licensed under the BSD 2-Clause License. See LICENSE.
+ */
+package com.fairyringatlas;
+
+import com.google.gson.Gson;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import org.junit.Test;
+
+public class RingGroupsTest
+{
+	private static final Gson GSON = new Gson();
+
+	/** The test fixture: Slayer AJR, CKS, DKS and Farming CIR, AIQ (with a bad and a repeated code). */
+	private static List<RingGroups.Def> defaults()
+	{
+		try (Reader r = new InputStreamReader(RingGroupsTest.class.getResourceAsStream("/fixtures/groups.json"), StandardCharsets.UTF_8))
+		{
+			return RingGroups.defaults(GSON.fromJson(r, RingGroups.DefFile.class));
+		}
+		catch (java.io.IOException e)
+		{
+			throw new AssertionError(e);
+		}
+	}
+
+	private static RingGroups fresh()
+	{
+		return RingGroups.parse(GSON, defaults(), null);
+	}
+
+	private static RingGroups.Group group(RingGroups g, String id)
+	{
+		for (RingGroups.Group x : g.view())
+		{
+			if (x.getId().equals(id))
+			{
+				return x;
+			}
+		}
+		return null;
+	}
+
+	/** Saved and read back, as the plugin does between sessions. */
+	private static RingGroups roundTrip(RingGroups g)
+	{
+		return RingGroups.parse(GSON, defaults(), g.format(GSON));
+	}
+
+	@Test
+	public void defaultsAreCleanedAndSeeded()
+	{
+		RingGroups g = fresh();
+		assertEquals(2, g.view().size());
+		RingGroups.Group slayer = group(g, "slayer");
+		assertEquals("Slayer", slayer.getName());
+		assertEquals(Arrays.asList("AJR", "CKS", "DKS"), slayer.getCodes());
+		assertTrue(slayer.isPrebuilt());
+		assertFalse(slayer.isModified());
+		assertEquals(Arrays.asList("CIR", "AIQ"), group(g, "farming").getCodes());
+		assertEquals("Fremennik Slayer Dungeon", g.note("slayer", "AJR"));
+		assertNull(g.note("slayer", "DKS"));
+		// nothing bundled or saved: no groups, and no crash
+		assertTrue(RingGroups.parse(GSON, RingGroups.defaults(null), null).view().isEmpty());
+	}
+
+	@Test
+	public void editAPrebuiltGroupAndResetIt()
+	{
+		RingGroups g = fresh();
+		assertTrue(g.add("slayer", "cip"));
+		assertFalse(g.add("slayer", "CIP"));
+		assertTrue(g.remove("slayer", "AJR"));
+		assertTrue(g.move("slayer", "CIP", 0));
+		assertTrue(g.rename("slayer", "  Tasks <col=ff0000> "));
+		g = roundTrip(g);
+		RingGroups.Group s = group(g, "slayer");
+		assertEquals("Tasks col=ff0000", s.getName());
+		assertEquals(Arrays.asList("CIP", "CKS", "DKS"), s.getCodes());
+		assertTrue(s.isModified());
+		// the bundled hints stay with the codes
+		assertEquals("Kalphites", g.note("slayer", "CKS"));
+		assertTrue(g.reset("slayer"));
+		assertEquals(Arrays.asList("AJR", "CKS", "DKS"), group(g, "slayer").getCodes());
+		assertEquals("Slayer", group(g, "slayer").getName());
+		assertFalse(group(g, "slayer").isModified());
+	}
+
+	@Test
+	public void undoingAnEditFollowsTheDefaultAgain()
+	{
+		RingGroups g = fresh();
+		g.remove("farming", "AIQ");
+		g.add("farming", "AIQ");
+		assertFalse(group(g, "farming").isModified());
+		g.rename("farming", "Farming");
+		assertFalse(group(roundTrip(g), "farming").isModified());
+	}
+
+	@Test
+	public void ownGroups()
+	{
+		RingGroups g = fresh();
+		String id = g.create("Bossing", "akq");
+		assertNotNull(id);
+		assertNull(g.create("   ", "AKQ"));
+		g.add(id, "DJR");
+		g = roundTrip(g);
+		RingGroups.Group own = group(g, id);
+		assertEquals("Bossing", own.getName());
+		assertEquals(Arrays.asList("AKQ", "DJR"), own.getCodes());
+		assertFalse(own.isPrebuilt());
+		assertFalse(g.reset(id));
+		assertEquals(3, g.view().size());
+		// ids are never reused while the group exists
+		assertFalse(id.equals(g.create("Other", null)));
+		assertTrue(g.contains(id, "DJR"));
+		assertFalse(g.contains(id, "CIR"));
+	}
+
+	@Test
+	public void deletedPrebuiltGroupsStayDeletedUntilRestored()
+	{
+		RingGroups g = fresh();
+		assertTrue(g.delete("slayer"));
+		g = roundTrip(g);
+		assertNull(group(g, "slayer"));
+		assertEquals(1, g.deleted().size());
+		assertTrue(g.restore("slayer"));
+		assertEquals(Arrays.asList("farming", "slayer"), Arrays.asList(g.view().get(0).getId(), g.view().get(1).getId()));
+		assertTrue(g.deleted().isEmpty());
+	}
+
+	@Test
+	public void aPrebuiltGroupAddedByAnUpdateJoinsAtTheEnd()
+	{
+		// saved before "farming" was bundled
+		String old = "{\"groups\":[{\"id\":\"slayer\"},{\"id\":\"u1\",\"name\":\"Mine\",\"codes\":[\"BKS\",\"bad\",\"BKS\"]}],\"seen\":[\"slayer\"]}";
+		RingGroups g = RingGroups.parse(GSON, defaults(), old);
+		List<RingGroups.Group> v = g.view();
+		assertEquals(Arrays.asList("slayer", "u1", "farming"), Arrays.asList(v.get(0).getId(), v.get(1).getId(), v.get(2).getId()));
+		assertEquals(Collections.singletonList("BKS"), v.get(1).getCodes());
+	}
+
+	@Test
+	public void collapsedPersists()
+	{
+		RingGroups g = fresh();
+		g.toggleCollapsed("farming");
+		assertTrue(group(roundTrip(g), "farming").isCollapsed());
+		g.toggleCollapsed("farming");
+		assertFalse(group(roundTrip(g), "farming").isCollapsed());
+	}
+
+	@Test
+	public void unreadableSavedStateFallsBackToDefaults()
+	{
+		assertEquals(2, RingGroups.parse(GSON, defaults(), "{not json").view().size());
+		assertEquals(2, RingGroups.parse(GSON, defaults(), "").view().size());
+	}
+
+	@Test
+	public void bundledGroupsAreDialableRings()
+	{
+		RingGroups.DefFile file = RingRepository.read(GSON, FairyRingAtlasPlugin.RESOURCES + "groups.json", RingGroups.DefFile.class);
+		assertNotNull("groups.json is bundled", file);
+		RingRepository repo = RingRepository.load(GSON, FairyRingAtlasPlugin.RESOURCES);
+		int codes = 0;
+		for (RingGroups.Def d : file.groups)
+		{
+			assertNotNull(d.id, RingGroups.cleanName(d.name));
+			for (RingGroups.Code c : d.codes)
+			{
+				Ring r = repo.ring(c.code);
+				assertTrue(d.id + " " + c.code, r != null && r.isDialable() && c.code.equals(DialMath.normalize(c.code)));
+				assertTrue(d.id + " " + c.code + " note", c.note == null || (c.note.length() <= 40 && c.note.matches("[ -~]*")));
+				codes++;
+			}
+			// nothing the loader would drop
+			assertEquals(d.codes.size(), RingGroups.defaults(file).get(file.groups.indexOf(d)).codes.size());
+		}
+		assertTrue(codes > 0);
+	}
+
+	@Test
+	public void namesAreCleaned()
+	{
+		assertEquals("abcdefghijklmnopqrstuvwx", RingGroups.cleanName("abcdefghijklmnopqrstuvwxyz"));
+		assertEquals("a b", RingGroups.cleanName(" a   b "));
+		assertNull(RingGroups.cleanName("<>"));
+	}
+}
