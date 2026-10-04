@@ -82,12 +82,13 @@ public class MapPreview
 		Rectangle free = new Rectangle(30, 30, 1738, 905);
 		render(repo, painter, out, "8-free-space", FairyRingAtlasPlugin.fitRings(MapView.of(surface, free), repo.ringsIn(Layer.SURFACE), 0, wide),
 			"CKS", "AIQ", new int[]{0, 1, 2}, false);
-		// the Groups panel open on the right with both prebuilt groups, a Slayer row hovered
+		// the Groups panel open on the right with both prebuilt groups, a Slayer row hovered (its note and
+		// details on the card; on the narrow map the longest details)
 		groupsOpen = true;
 		render(repo, painter, out, "9-groups", FairyRingAtlasPlugin.fitRings(MapView.of(surface, free), repo.ringsIn(Layer.SURFACE), 0,
 			FairyRingAtlasPlugin.chromeInsets(free.width, false, true, false)), "CIR", "AJR", new int[]{0, 1, 2}, false);
 		render(repo, painter, out, "10-groups-fixed", FairyRingAtlasPlugin.fitRings(MapView.of(surface, fixed), repo.ringsIn(Layer.SURFACE), 0,
-			FairyRingAtlasPlugin.chromeInsets(fixed.width, true, true, false)), "CKS", null, new int[]{1, 3, 0}, true);
+			FairyRingAtlasPlugin.chromeInsets(fixed.width, true, true, false)), "CKS", "DKR", new int[]{1, 3, 0}, true);
 		groupsOpen = false;
 		ringChecks(repo, painter, out);
 		icons(repo, painter, out);
@@ -221,6 +222,7 @@ public class MapPreview
 			// as when hovered in the first group's row
 			String note = groups.note(s.groups.get(0).getId(), hovered);
 			s.hoveredNote = note == null ? null : s.groups.get(0).getName() + ": " + note;
+			s.hoveredDetails = groups.details(s.groups.get(0).getId(), hovered);
 		}
 		s.clueX = 3110;
 		s.clueY = 3165;

@@ -72,6 +72,10 @@ public class RingGroupsTest
 		assertEquals(Arrays.asList("CIR", "AIQ"), group(g, "farming").getCodes());
 		assertEquals("Fremennik Slayer Dungeon", g.note("slayer", "AJR"));
 		assertNull(g.note("slayer", "DKS"));
+		assertEquals("Monsters: kurasks", g.details("slayer", "AJR"));
+		assertNull(g.details("slayer", "DKS"));
+		assertNull(g.details("slayer", null));
+		assertNull(g.details("nope", "AJR"));
 		// nothing bundled or saved: no groups, and no crash
 		assertTrue(RingGroups.parse(GSON, RingGroups.defaults(null), null).view().isEmpty());
 	}
@@ -347,6 +351,16 @@ public class RingGroupsTest
 				Ring r = repo.ring(c.code);
 				assertTrue(d.id + " " + c.code, r != null && r.isDialable() && c.code.equals(DialMath.normalize(c.code)));
 				assertTrue(d.id + " " + c.code + " note", c.note == null || (c.note.length() <= 40 && c.note.matches("[ -~]*")));
+				// what is there, in at most two card lines: printable ASCII, and nothing every patch has
+				assertTrue(d.id + " " + c.code + " details", c.details == null || (c.details.length() <= 90
+					&& c.details.matches("[ -~]*") && c.details.equals(c.details.trim())));
+				if (c.details != null)
+				{
+					String lower = c.details.toLowerCase();
+					assertFalse(d.id + " " + c.code + " details", lower.contains("compost") || lower.contains("leprechaun"));
+					assertTrue(d.id + " " + c.code + " details", "farming".equals(d.id) ? c.details.startsWith("Patches: ")
+						: c.details.startsWith("Monsters: ") || c.details.startsWith("Master"));
+				}
 				// every prebuilt row says what it is for, in a name the loader keeps as it is
 				assertNotNull(d.id + " " + c.code + " label", c.label);
 				assertTrue(d.id + " " + c.code + " label", c.label.length() <= RingGroups.NAME_MAX && c.label.matches("[ -~]*")

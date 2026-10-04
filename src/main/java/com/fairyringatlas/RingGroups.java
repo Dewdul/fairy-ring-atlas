@@ -30,12 +30,16 @@ final class RingGroups
 	static final int NAME_MAX = 24;
 	static final int GROUPS_MAX = 30;
 
-	/** A code in groups.json, with an optional row label (what it is for) and a short display hint. */
+	/**
+	 * A code in groups.json, with an optional row label (what it is for), a short display hint and
+	 * details (what is there: the patch types or the slayer monsters).
+	 */
 	static final class Code
 	{
 		String code;
 		String label;
 		String note;
+		String details;
 	}
 
 	/** A prebuilt group in groups.json. */
@@ -132,6 +136,7 @@ final class RingGroups
 					k.code = n;
 					k.label = cleanName(code.label);
 					k.note = code.note;
+					k.details = code.details;
 					c.codes.add(k);
 				}
 			}
@@ -268,18 +273,15 @@ final class RingGroups
 	/** The bundled hint for a code in a prebuilt group, or null. */
 	String note(String id, String code)
 	{
-		Def d = def(id);
-		if (d != null && code != null)
-		{
-			for (Code c : d.codes)
-			{
-				if (code.equals(c.code))
-				{
-					return c.note == null || c.note.trim().isEmpty() ? null : c.note.trim();
-				}
-			}
-		}
-		return null;
+		Code c = bundled(id, code);
+		return c == null ? null : trimmed(c.note);
+	}
+
+	/** What is at a code's spot in a prebuilt group (e.g. "Patches: herb, 2 allotments, flower"), or null. */
+	String details(String id, String code)
+	{
+		Code c = bundled(id, code);
+		return c == null ? null : trimmed(c.details);
 	}
 
 	/** Whether there are as many groups as there can be: no new or restored ones until one goes. */
@@ -488,21 +490,33 @@ final class RingGroups
 		return null;
 	}
 
-	/** The bundled label of a code in a prebuilt group, or null. */
-	private String bundledLabel(String id, String code)
+	/** A code's bundled entry in a prebuilt group, or null. */
+	private Code bundled(String id, String code)
 	{
 		Def d = def(id);
-		if (d != null)
+		if (d != null && code != null)
 		{
 			for (Code c : d.codes)
 			{
 				if (c.code.equals(code))
 				{
-					return c.label;
+					return c;
 				}
 			}
 		}
 		return null;
+	}
+
+	/** The bundled label of a code in a prebuilt group, or null. */
+	private String bundledLabel(String id, String code)
+	{
+		Code c = bundled(id, code);
+		return c == null ? null : c.label;
+	}
+
+	private static String trimmed(String s)
+	{
+		return s == null || s.trim().isEmpty() ? null : s.trim();
 	}
 
 	private String name(Stored s)

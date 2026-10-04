@@ -162,7 +162,7 @@ public class ChromePainter
 		boolean flash = s.now < s.flashUntil && (s.now / 250) % 2 == 0;
 		return java.util.Objects.hash(v.getX(), v.getY(), v.getW(), v.getH(), v.getLayer(), s.selected, s.hovered,
 			java.util.Arrays.hashCode(s.dials), s.query, s.rowVisible, s.notice, s.panelCollapsed, s.panelScroll,
-			s.faveOrder, s.dragList, s.dragCode, s.dragCode == null ? 0 : s.dragY, s.groupsOpen, s.groups, s.groupsScroll, s.hoveredNote,
+			s.faveOrder, s.dragList, s.dragCode, s.dragCode == null ? 0 : s.dragY, s.groupsOpen, s.groups, s.groupsScroll, s.hoveredNote, s.hoveredDetails,
 			s.now < s.flashUntil, flash, hover, s.holes, s.teleportSlot, s.repo.getStateHash(), s.here,
 			s.visitedColor, s.selectedColor, s.favouriteColor, s.fullDetails, focusCovered(s));
 	}
@@ -982,16 +982,25 @@ public class ChromePainter
 				}
 			}
 		}
-		if (s.hoveredNote != null && ring == s.hovered)
+		if (ring == s.hovered && (s.hoveredNote != null || s.hoveredDetails != null))
 		{
-			// hovered in a group: why the group has it
-			if (full)
+			// hovered in a group: why the group has it, then what is there (patches, monsters) in at most
+			// two lines; the compact card shows only what is there when it has both, so it grows by a line
+			// at most
+			if (s.hoveredNote != null && (full || s.hoveredDetails == null))
 			{
-				addWrapped(lines, s.hoveredNote, ink.small, HINT, textW, 0);
+				if (full)
+				{
+					addWrapped(lines, s.hoveredNote, ink.small, HINT, textW, 0);
+				}
+				else
+				{
+					lines.add(new Line(ink.fit(s.hoveredNote, ink.small, textW), ink.small, HINT, 0));
+				}
 			}
-			else
+			if (s.hoveredDetails != null)
 			{
-				lines.add(new Line(ink.fit(s.hoveredNote, ink.small, textW), ink.small, HINT, 0));
+				addWrapped(lines, s.hoveredDetails, ink.small, HINT, textW, 0, 2);
 			}
 		}
 		if (full)
@@ -1151,11 +1160,21 @@ public class ChromePainter
 
 	private void addWrapped(List<Line> lines, String text, Font f, Color c, int w, int gap)
 	{
-		boolean first = true;
-		for (String t : ink.wrap(text, f, w))
+		addWrapped(lines, text, f, c, w, gap, Integer.MAX_VALUE);
+	}
+
+	/** Wrapped to at most max lines; the last one ends in "..." when there is more. */
+	private void addWrapped(List<Line> lines, String text, Font f, Color c, int w, int gap, int max)
+	{
+		List<String> wrapped = ink.wrap(text, f, w);
+		for (int i = 0; i < Math.min(max, wrapped.size()); i++)
 		{
-			lines.add(new Line(t, f, c, first ? gap : 0));
-			first = false;
+			String t = wrapped.get(i);
+			if (i == max - 1 && wrapped.size() > max)
+			{
+				t = ink.fit(t + " " + String.join(" ", wrapped.subList(max, wrapped.size())), f, w);
+			}
+			lines.add(new Line(t, f, c, i == 0 ? gap : 0));
 		}
 	}
 

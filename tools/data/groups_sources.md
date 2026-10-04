@@ -6,7 +6,8 @@ Each group is in suggested order: most useful first for Slayer, run order for
 Farming. Labels are the rows' names in the panel: purpose first, at most 24
 printable ASCII characters, each taken from that row's note and sources below
 (nothing beyond them). Notes are optional display hints of at most 40
-printable ASCII characters, shown when a row is hovered.
+printable ASCII characters, shown when a row is hovered. Details (see *Details*
+at the end) say what is at the spot, at most 90 printable ASCII characters.
 
 The OSRS Wiki was read via `?action=raw` on 2026-10-03. Ring tiles are the
 `rings.json` landing tiles. Patch tiles are the wiki's `{{Map}}` pins on the
@@ -85,3 +86,51 @@ tree, fruit tree and calquat, then special, hops and bush patches.
   ring among their listed closest teleports.
 - **Tithe Farm** is a minigame, not a patch. AKR is already in the group for
   the vinery.
+
+## Details
+
+Read via `?action=raw` on 2026-10-04. Slayer details name the task monsters
+from the location page's monster tables (`LocationMonsterTableLine`) or
+monster list, most task-relevant first, and Slayer levels from those tables.
+Farming details name the patch types from the `*/Patches` transclusions of
+`Farming/Patch_locations`, with counts above one. No compost bins and no tool
+leprechauns: every farming spot has them. Where a list is longer than 90
+characters, the lowest-level or least-used entries were left off.
+
+### Slayer
+
+| Code | Details | Source |
+|---|---|---|
+| CKS | Monsters: abyssal demons, nechryael, gargoyles, aberrant spectres, bloodvelds, banshees | `Slayer_Tower` monster tables: basement and floors 0-2 (crawling hands and infernal mages left off). |
+| AJR | Monsters: kurasks, turoths, basilisks, jellies, pyrefiends, cockatrices, rockslugs | `Fremennik_Slayer_Dungeon` overview: the eight chambers (cave crawlers left off for length). |
+| CIR | Master: Konar (75 combat). Dungeon: hydras, drakes, wyrms, sulphur lizards, fire giants | `Slayer_Master` (Konar quo Maten: 75 combat). `Karuulm_Slayer_Dungeon` monster tables (hellhounds, greater demons and the Alchemical Hydra left off). |
+| BKS | Master: Chaeldar (70 combat, Lost City) | `Slayer_Master` (Chaeldar: Lost City and 70 combat). |
+| BIQ | Monsters: kalphite workers, soldiers and guardians; Kalphite Queen (Lair) | `Kalphite_Lair` monster list (workers, soldiers, guardians, Queen). `Kalphite_Cave` monster table (workers, soldiers, guardians). |
+| BKP | Monsters: smoke devils (93 Slayer); Thermonuclear smoke devil (boss) | `Smoke_Devil_Dungeon` monster table (both 93 Slayer). |
+| DJR | Monsters: black, greater and lesser demons (Chasm); lizardmen and shamans (canyon) | `Chasm_of_Fire` monster table. `Lizardman_Canyon`: lizardmen and brutes in both valleys, shamans in the west one. |
+| AKQ | Monsters: cave kraken (87 Slayer), waterfiends; Kraken (boss) | `Kraken_Cove` monster table. |
+| DIP | Monsters: Abyssal Sire (85 Slayer; on an abyssal demon or boss task) | `Abyssal_Sire`: 85 Slayer; fought only when assigned abyssal demons or the Sire itself. |
+| AIQ | Monsters: skeletal wyverns, ice giants, ice warriors, hobgoblins; mogres (shore) | `Asgarnian_Ice_Dungeon` monster table (muggers and pirates left off: not tasks). `Mudskipper_Point`: mogres are driven to the shore. |
+| ALP | Monsters: dagannoths (basement, after Horror from the Deep) | `Lighthouse`: after the quest the dungeon is crawling with dagannoth. |
+| BJS | Monsters: Zulrah (boss task); 76 Agility stepping stones | `Zulrah` (boss task changes; the stepping stones need 76 Agility, as in the note's source). |
+| ALQ | Monsters: araxytes (92 Slayer); Araxxor (boss) | `Morytania_Spider_Cave` (araxytes, Araxxor's cavern). `Araxyte`: 92 Slayer. |
+| DKR | Masters: Krystilia, Vannaka. Edgeville Dungeon: hill giants, chaos druids, earth warriors | `Slayer_Master` (Krystilia by the Edgeville jail; Vannaka in Edgeville Dungeon). `Edgeville_Dungeon` monster tables (chaos druids and earth warriors are in its Wilderness part). |
+
+### Farming
+
+| Code | Details | Source |
+|---|---|---|
+| ALQ | Patches: herb, 2 allotments, flower | `Allotment_patch/Patches` (west of Port Phasmatys). |
+| BLR | Patches: herb, 2 allotments, flower | `Allotment_patch/Patches` (north of Ardougne). |
+| AKR | Patches: 12 grape vines (vinery); herb, 2 allotments, flower, spirit tree (west) | `Special_patches/Patches` (grape, 12 patches, Hosidius Vinery). `Allotment_patch/Patches` (Hosidius). `Spirit_Tree_(Farming)/Patches` (Hosidius, 1693,3542, by the allotments). |
+| CIR | Patches: herb, 2 allotments, flower, bush, cactus, 5 trees (to redwood), anima, Hespori | `Allotment_patch/Patches`, `Bush_patch/Patches`, `Special_patches/Patches` (cactus, anima, Hespori, celastrus, redwood), `Tree_patch/Patches`, `Fruit_tree_patch/Patches`, `Spirit_Tree_(Farming)/Patches`: all list the Farming Guild. The 5 trees are tree, fruit tree, spirit tree, celastrus and redwood. |
+| AJP | Patches: herb, 2 allotments, flower (Ortus Farm); hardwood tree (Locus Oasis) | `Allotment_patch/Patches` (Ortus Farm). `Special_patches/Patches` and `Locus_Oasis` (one hardwood patch). |
+| AIS | Patches: tree (Nemus Retreat); belladonna (Auburnvale) | `Tree_patch/Patches`, `Nemus_Retreat`. `Special_patches/Patches`, `Auburnvale`. |
+| CIQ | Patches: fruit tree (Gnome Village); hops (Yanille) | `Fruit_tree_patch/Patches`, `Hops_patch/Patches`. |
+| CKR | Patches: calquat | `Special_patches/Patches`, `Tai_Bwo_Wannai`. |
+| CJQ | Patches: calquat; 2 coral nurseries (after Troubled Tortugans) | `Special_patches/Patches` (Summer Shore calquat; coral nursery). `Coral_nursery_(patch)`: two nurseries after Troubled Tortugans. |
+| CKS | Patches: mushroom | `Special_patches/Patches` (west of Canifis). |
+| ALS | Patches: hops | `Hops_patch/Patches` (McGrubor's Wood). |
+| CKQ | Patches: hops | `Hops_patch/Patches`. `Aldarin`: the hops patch is next to the ring. |
+| DJP | Patches: bush | `Bush_patch/Patches` (south of Ardougne). |
+| CIP | Patches: bush, spirit tree | `Bush_patch/Patches`, `Spirit_Tree_(Farming)/Patches`, `Etceteria` (its vegetable and flower patches are kingdom-only). |

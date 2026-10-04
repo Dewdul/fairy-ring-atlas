@@ -1182,6 +1182,13 @@ public class FairyRingAtlasPlugin extends Plugin
 		return note == null ? null : g.getName() + ": " + note;
 	}
 
+	/** Client thread: what is at a ring hovered in a prebuilt group's row, e.g. "Patches: bush, spirit tree"; else null. */
+	String groupDetails(String hitId, String code)
+	{
+		String id = Hit.groupOf(hitId);
+		return id == null || group(id) == null ? null : groups.details(id, code);
+	}
+
 	/** Whether the Groups panel is open for a map of this width: as saved, but closed on a narrow map until opened there. */
 	boolean isGroupsOpen(int mapWidth)
 	{

@@ -64,6 +64,8 @@ public final class Scene
 	public int groupsScroll;
 	/** A hint for the hovered ring from the group row it is hovered in (a prebuilt group's note), or null. */
 	public String hoveredNote;
+	/** What is at the hovered ring's spot, from the same group row (its patches or slayer monsters), or null. */
+	public String hoveredDetails;
 	public double clueX = Double.NaN;
 	public double clueY = Double.NaN;
 	public Point mouse;

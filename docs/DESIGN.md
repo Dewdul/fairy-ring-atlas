@@ -1223,11 +1223,16 @@ pre built groups for slayer and farming, but make it customizable so people can 
 click groups".
 
 **Data.** `groups.json` (beside `rings.json`) holds the prebuilt groups:
-`{"groups":[{"id":"slayer","name":"Slayer","codes":[{"code":"CKS","label":"Slayer Tower","note":"..."}, ...]}, ...]}`.
+`{"groups":[{"id":"slayer","name":"Slayer","codes":[{"code":"CKS","label":"Slayer Tower","note":"...","details":"Monsters: ..."}, ...]}, ...]}`.
 The order is the suggested use or run order. A label is the row's purpose-first name (at most 24
 printable ASCII characters, cleaned like a group name; every bundled row has one, based only on
 that row's researched note and sources); a note is an optional hint of at most 40 printable ASCII
-characters, shown on hover. Sources are in `tools/data/groups_sources.md`. A missing or unreadable file leaves only
+characters, shown on hover. Details (added 2026-10-04, at the user's request: "show the types of
+patches (Farming) or slayer monsters (Slayer) - without taking much UI space") say what is at the
+spot, at most 90 printable ASCII characters: "Patches: herb, 2 allotments, flower" (types, with
+counts above one, never compost bins or tool leprechauns, which every farming spot has) or
+"Monsters: ..." / "Master: ..." (most task-relevant first). They are optional: an entry the wiki did
+not confirm has none. Sources are in `tools/data/groups_sources.md`. A missing or unreadable file leaves only
 the player's own groups. `RingGroups.defaults` drops invalid and repeated codes.
 
 **Look and place.** The panel mirrors the left one (`ChromePainter.paintGroups`): a header row per
@@ -1254,7 +1259,9 @@ slot, grown by 8 px for their frames), so it never covers Teleport or close.
 
 **Use.** Clicking a ring row selects it and zooms to it like a favourite (`showFavourite`).
 Hovering it shows its card, with the group's note as a hint line ("Slayer: Kurasks, turoths,
-basilisks and more"). Clicking a
+basilisks and more") and then its details, wrapped to at most two lines (the second cut with "..."
+when needed, `ChromePainter.addWrapped(..., max)`). The compact card shows only the details when a
+row has both, so it grows by one line at most; the full card shows both. Clicking a
 header collapses or expands the group.
 
 **Customising.** Everything is plugin state, changed only through `MenuAction.RUNELITE` entries
@@ -1293,7 +1300,7 @@ parsed again when the saved string differs from the one this plugin last read or
 (`RingGroupsTest`):
 - A saved prebuilt group stores only what differs from its default (name, codes, row labels); an edit that
   makes it equal to the default again drops the difference, so an untouched group follows updates to
-  `groups.json`, and *Reset to default* just forgets the changes. Notes always come from the bundled
+  `groups.json`, and *Reset to default* just forgets the changes. Notes and details always come from the bundled
   file.
 - Row labels the player typed are saved per group as `labels` (code to name), only for rows that
   differ from their default (`RingGroups.renameRow` / `resetRow`): typing the bundled label, or for a
