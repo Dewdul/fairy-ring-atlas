@@ -56,20 +56,24 @@ for l in idx["labels"]:
     b = layers[l["layer"]]["bounds"]
     check(b[0] <= l["x"] < b[2] and b[1] <= l["y"] < b[3], "label outside its layer: %s" % l)
     check(l["s"] in (0, 1, 2), "label size %s" % l)
-for i in idx["icons"]:
-    check(any(L["bounds"][0] <= i["x"] < L["bounds"][2] and L["bounds"][1] <= i["y"] < L["bounds"][3] for L in idx["layers"]),
-          "icon outside every layer: %s" % i)
+for x, y, sprite in idx["icons"]:  # compact [x, y, sprite] triples
+    check(any(L["bounds"][0] <= x < L["bounds"][2] and L["bounds"][1] <= y < L["bounds"][3] for L in idx["layers"]),
+          "icon outside every layer: %s" % [x, y, sprite])
 
-# z=-1 is the 8x8 area average of z=2: pixel (px,py) of tile (tx,ty) shows game tiles
-# x = tx*512 + 2px .. +1, y = (ty+1)*512 - 1 - 2py .. -1. Compare at Lumbridge castle.
-x, y = 3208, 3216
-tx, ty = x // 512, y // 512
-px, py = (x - tx * 512) // 2, ((ty + 1) * 512 - 1 - y) // 2
-zm1 = np.asarray(Image.open(os.path.join(mapgen.OUT, "-1", "%d_%d.png" % (tx, ty))).convert("RGB")).astype(float)
-z2 = np.asarray(Image.open(os.path.join(mapgen.OUT, "2", "%d_%d.png" % (x // 64, y // 64))).convert("RGB")).astype(float)
-qx, qy = (x - (x // 64) * 64) * 4, ((y // 64 + 1) * 64 - 1 - y) * 4
-blk = z2[qy - qy % 8:qy - qy % 8 + 8, qx - qx % 8:qx - qx % 8 + 8].reshape(-1, 3).mean(axis=0)
-check(np.max(np.abs(zm1[py, px] - blk)) < 24, "z=-1 vs z=2 mismatch at Lumbridge: %s vs %s" % (zm1[py, px], blk))
+# the surface covers the world map's whole surface (minus its void frame): every region in it is
+# shipped, a recorded solid tile, or (checked against the raw render when present) plain background
+sb = layers["surface"]["bounds"]
+check(sb == mapgen.SURFACE_BOUNDS, "surface bounds %s, expected %s" % (sb, mapgen.SURFACE_BOUNDS))
+bg = tuple(int(layers["surface"]["background"][k:k + 2], 16) for k in (1, 3, 5))
+shipped2 = set(idx["tiles"]["2"])
+plain = [rc for rc in mapgen.regions_in(sb) if "%d_%d" % rc not in shipped2 and "%d_%d" % rc not in idx["solid"]["2"]]
+for rc in plain:
+    a = mapgen.load_raw(*rc)
+    if a is not None:
+        a = a.copy()
+        mapgen.paint_outside({rc: a}, [rc], sb, bg)
+        check(np.all(a == np.array(bg, dtype=np.uint8)), "surface region %s is not shipped but is not plain sea" % (rc,))
+print("surface %s: %d regions, %d shipped or solid, %d plain sea" % (sb, len(mapgen.regions_in(sb)), len(mapgen.regions_in(sb)) - len(plain), len(plain)))
 
 ring_bytes = os.path.getsize(mapgen.RINGS_JSON) if os.path.exists(mapgen.RINGS_JSON) else 0
 total = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(mapgen.OUT) for f in fs) + ring_bytes

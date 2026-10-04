@@ -18,14 +18,17 @@ icons and labels switched off. No wiki or third-party imagery is bundled.
 |---|---|
 | Cache | OpenRS2 archive id **2727**, OSRS live, 2026-09-30, build 241 (0 XTEA keys needed) |
 | Renderer | `net.runelite:cache:1.13.1` `MapImageDumper.drawRegion(region, 0)` |
-| z=2 | 1149 tiles, 5,429,496 bytes (1146 PNG8, 3 PNG24) |
-| z=-1 | 35 tiles, 769,487 bytes (31 PNG8, 4 PNG24) |
-| index.json | 134,375 bytes: 12 layers, 538 labels, 2616 icons |
-| `map/` total | **6,333,358 bytes (6.04 MiB)** in 1185 files |
-| Budget | `map/` + `rings.json` <= 6.5 MiB (6,815,744 bytes); leaves ~480 KB for `rings.json` |
+| Surface | the whole world map surface: bounds x 1016-3976, y 2104-4168 (1632 regions rendered) |
+| z=2 | 1632 tiles, 6,591,284 bytes (1629 PNG8, 3 PNG24); 2 solid surface tiles recorded, 54 plain-sea regions not shipped |
+| z=-1 | 42 tiles, 852,226 bytes (38 PNG8, 4 PNG24) |
+| index.json | 97,782 bytes: 12 layers, 578 labels, 2697 icons |
+| `map/` total | **7,541,292 bytes (7.19 MiB)** in 1675 files |
+| `src/main/resources` | 7,585,896 bytes (7.23 MiB) with `rings.json` (44,604 bytes); plugin jar 7,692,277 bytes |
+| Budget | `map/` + `rings.json` <= 7.6 MiB (7,969,177 bytes), so the jar stays under the hub's 8 MiB warning |
 
-Lossy PNG8 tiles: 516, PSNR >= 40.0 dB (median 42.5 dB). The rest are
-lossless palette tiles (<= 256 colours) or PNG24.
+Lossy PNG8 tiles: 540, PSNR >= 40.0 dB (median 42.5 dB). The rest are
+lossless palette tiles (<= 256 colours) or PNG24. No ocean-specific
+compression was needed to fit the budget.
 
 ## Regenerate
 
@@ -55,15 +58,16 @@ python tools/mapgen/verify.py                # contract checks; exit 1 on failur
 `render` accepts `-Pcache=<dir>` (any OSRS disk cache, e.g. a copy of
 `~/.runelite/jagexcache/oldschool/LIVE`), `-Pout=<dir>` and `-Pregions=<file>`.
 `build --tighten` drops open-sea surface regions that are more than 2 regions
-from both land and rings; it is not needed at the current size.
+from both land and rings (the plugin then paints them flat sea); it is not
+needed at the current size.
 
 ## Pipeline
 
-1. **`mapgen.py plan`** reads `tools/data/fairy_rings.verified.json`, computes
-   the surface crop (bounding box of the surface rings +-2 regions:
-   x 1152-3776, y 2304-4032, 41x27 regions) and the off-surface render areas
-   (DESIGN 3.3), checks every ring lies inside its layer and writes
-   `regions.json`.
+1. **`mapgen.py plan`** reads `tools/data/fairy_rings.verified.json`, takes the
+   whole surface (`SURFACE_RENDER`: x 960-4032, y 2048-4224, 48x34 regions,
+   exactly the map squares of the world map's own "Gielinor Surface") and the
+   off-surface render areas (DESIGN 3.3), checks every ring lies inside its
+   layer and writes `regions.json`.
 2. **`MapGen.java`** (`./gradlew -p tools/mapgen render`) loads the cache with
    `Store` + `RegionLoader`, runs `MapImageDumper` with
    `setRenderIcons(false)` / `setRenderLabels(false)` and writes
@@ -75,9 +79,17 @@ from both land and rings; it is not needed at the current size.
      (text, position, `textScale` 0/1/2, `textColor`);
    - `icons.json`: every map-function icon: map locations whose object has a
      `mapAreaId` (`AreaDefinition.spriteId`), plus unnamed world-map elements
-     (the intermap link arrows), exactly as `MapImageDumper` draws them.
+     (the intermap link arrows), exactly as `MapImageDumper` draws them;
+   - `cache_regions.json`: every region with map data, and `worldmaps.json`:
+     each world map's name and the map squares/zones it shows (from the
+     `worldmap` index's `details` and `compositemap` archives). `build` checks
+     that the surface map's squares are still exactly `SURFACE_RENDER`.
 3. **`mapgen.py build`**
-   - **Layers.** Surface bounds = the crop. Each off-surface layer keeps only the
+   - **Layers.** Surface bounds = `SURFACE_BOUNDS`, x 1016-3976, y 2104-4168:
+     the outermost 56 tiles of `SURFACE_RENDER` on every side are void
+     (`#202f3d`), so the bounds are the content inside that frame (`build`
+     recomputes it and warns if it moves), and the frame's pixels in the edge
+     tiles are painted open sea. Each off-surface layer keeps only the
      regions that belong to the destination (`keep` in `LAYERS`; the wiki-basemap
      bounds also pull in unrelated areas packed next to them in the cache). Its
      index bounds are the bbox of non-black pixels + 8 tiles, clamped to the kept
@@ -87,8 +99,9 @@ from both land and rings; it is not needed at the current size.
      open-sea tiles (the most common single-colour surface tile).
      Off-surface: `#000000` (empty map squares render black, `TYPE_INT_RGB`).
    - **Solid tiles** are not shipped. A solid tile whose colour differs from its
-     layer background is recorded in `index.json` `solid`. (Today every solid
-     tile equals the background: most of the Sailing-era ocean is textured.)
+     layer background is recorded in `index.json` `solid`. (Today only two
+     are: surface regions 17_55 and 17_56, `#536998`; every other solid tile
+     equals the background, as most of the Sailing-era ocean is textured.)
    - **z=-1**: for every 512x512-tile block touching a layer, a 2048x2048 mosaic
      of the (unquantised, masked) z=2 renders, with missing regions filled with
      the layer background, box-filtered 8:1 (`Image.reduce(8)`).

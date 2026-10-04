@@ -85,7 +85,7 @@ public class Layer
 	static List<Layer> defaults()
 	{
 		return Arrays.asList(
-			new Layer(SURFACE, "Gielinor", 1152, 2368, 3776, 4032, "#203a4c"),
+			new Layer(SURFACE, "Gielinor", 1016, 2104, 3976, 4168, "#4a5d89"),
 			new Layer("zanaris", "Zanaris", 2304, 4288, 2560, 4544, "#000000"),
 			new Layer("abyss", "The Abyss", 2880, 4672, 3200, 4992, "#000000"),
 			new Layer("dorgesh_south", "Dorgesh-Kaan South Dungeon", 2624, 5120, 2816, 5312, "#000000"),

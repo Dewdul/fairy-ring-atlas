@@ -44,12 +44,23 @@ import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import net.runelite.cache.AreaManager;
+import net.runelite.cache.IndexType;
 import net.runelite.cache.MapImageDumper;
 import net.runelite.cache.ObjectManager;
 import net.runelite.cache.WorldMapManager;
 import net.runelite.cache.definitions.AreaDefinition;
+import net.runelite.cache.definitions.MapSquareDefinition;
 import net.runelite.cache.definitions.ObjectDefinition;
+import net.runelite.cache.definitions.WorldMapCompositeDefinition;
+import net.runelite.cache.definitions.WorldMapDefinition;
 import net.runelite.cache.definitions.WorldMapElementDefinition;
+import net.runelite.cache.definitions.ZoneDefinition;
+import net.runelite.cache.definitions.loaders.WorldMapCompositeLoader;
+import net.runelite.cache.definitions.loaders.WorldMapLoader;
+import net.runelite.cache.fs.Archive;
+import net.runelite.cache.fs.FSFile;
+import net.runelite.cache.fs.Index;
+import net.runelite.cache.fs.Storage;
 import net.runelite.cache.fs.Store;
 import net.runelite.cache.region.Location;
 import net.runelite.cache.region.Position;
@@ -76,6 +87,8 @@ import net.runelite.cache.util.XteaKeyManager;
  * <li>{@code labels.json}: [{t, x, y, z, s, c}] every named world-map element.</li>
  * <li>{@code icons.json}: [{x, y, z, sprite, src}] map-function icons from map
  * locations (src "loc") and from unnamed world-map elements (src "element").</li>
+ * <li>{@code cache_regions.json}: [[rx, ry], ...] every region with map data.</li>
+ * <li>{@code worldmaps.json}: the world map's maps, names and map squares (see worldMaps).</li>
  * </ul>
  */
 public class MapGen
@@ -213,7 +226,80 @@ public class MapGen
 			System.out.println("Exported " + labels.size() + " labels and " + icons.size() + " icons (all planes, whole world)");
 			write(gson, labels, new File(outDir, "labels.json"));
 			write(gson, icons, new File(outDir, "icons.json"));
+
+			// ---- the extent of the surface: every region in the cache, and the world map's squares ----
+			JsonArray all = new JsonArray();
+			for (Region region : regionLoader.getRegions())
+			{
+				JsonArray a = new JsonArray();
+				a.add(region.getRegionX());
+				a.add(region.getRegionY());
+				all.add(a);
+			}
+			write(gson, all, new File(outDir, "cache_regions.json"));
+			write(gson, worldMaps(store), new File(outDir, "worldmaps.json"));
 		}
+	}
+
+	/**
+	 * The world map's own definitions: per map (details archive) its name, and per composite map the
+	 * 64x64 map squares and 8x8 zones it shows ([srcX, srcY, dispX, dispY, minLevel, levels]), so the
+	 * surface's real extent can be read from the cache instead of guessed.
+	 */
+	private static JsonArray worldMaps(Store store) throws IOException
+	{
+		Storage storage = store.getStorage();
+		Index index = store.getIndex(IndexType.WORLDMAP);
+		Map<Integer, JsonObject> maps = new LinkedHashMap<>();
+		Archive details = index.isNamed() ? index.findArchiveByName("details") : index.getArchive(0);
+		if (details != null)
+		{
+			for (FSFile f : details.getFiles(storage.loadArchive(details)).getFiles())
+			{
+				WorldMapDefinition d = new WorldMapLoader().load(f.getContents(), f.getFileId());
+				JsonObject o = new JsonObject();
+				o.addProperty("file", f.getFileId());
+				o.addProperty("name", d.getName());
+				o.addProperty("safeName", d.getSafeName());
+				o.addProperty("surface", d.isSurface());
+				maps.put(f.getFileId(), o);
+			}
+		}
+		Archive composite = index.isNamed() ? index.findArchiveByName("compositemap") : index.getArchive(1);
+		WorldMapCompositeLoader loader = new WorldMapCompositeLoader().configureForRevision(index.getRevision());
+		for (FSFile f : composite.getFiles(storage.loadArchive(composite)).getFiles())
+		{
+			WorldMapCompositeDefinition c = loader.load(f.getContents());
+			JsonObject o = maps.computeIfAbsent(f.getFileId(), k -> new JsonObject());
+			o.addProperty("file", f.getFileId());
+			JsonArray squares = new JsonArray();
+			for (MapSquareDefinition m : c.getMapSquareDefinitions())
+			{
+				squares.add(ints(m.getSourceSquareX(), m.getSourceSquareZ(), m.getDisplaySquareX(), m.getDisplaySquareZ(),
+					m.getMinLevel(), m.getLevels()));
+			}
+			JsonArray zones = new JsonArray();
+			for (ZoneDefinition z : c.getZoneDefinitions())
+			{
+				zones.add(ints(z.getSourceSquareX(), z.getSourceSquareZ(), z.getDisplaySquareX(), z.getDisplaySquareZ(),
+					z.getMinLevel(), z.getLevels(), z.getSourceZoneX(), z.getSourceZoneZ(), z.getDisplayZoneX(), z.getDisplayZoneZ()));
+			}
+			o.add("squares", squares);
+			o.add("zones", zones);
+		}
+		JsonArray out = new JsonArray();
+		maps.values().forEach(out::add);
+		return out;
+	}
+
+	private static JsonArray ints(int... v)
+	{
+		JsonArray a = new JsonArray();
+		for (int i : v)
+		{
+			a.add(i);
+		}
+		return a;
 	}
 
 	private static JsonObject icon(Position p, AreaDefinition area, String src)

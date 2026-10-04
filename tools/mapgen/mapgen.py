@@ -34,9 +34,17 @@ REGIONS_JSON = os.path.join(HERE, "regions.json")
 CACHE_PROVENANCE = "openrs2 2727 (2026-09-30, build 241)"
 TILE = 256
 REGION = 64
-BUDGET = int(6.5 * 1024 * 1024)
+BUDGET = int(7.6 * 1024 * 1024)  # all of src/main/resources; keeps the jar under the hub's 8 MiB warning
 PSNR_MIN = float(os.environ.get("MAPGEN_PSNR", "40.0"))  # below this a PNG8 candidate counts as "visibly degraded"
-SURFACE_MARGIN = 2       # regions around the ring bounding box
+# The whole surface. The world map's own "Gielinor Surface" (worldmap details file 0) shows
+# exactly the 64x64 map squares rx 15-62, ry 32-65 (1632 squares, all at their own position;
+# MapGen exports them to build/raw/worldmaps.json): SURFACE_RENDER. Every one of them has map
+# data, but the outermost 56 tiles on every side are void (MapImageDumper paints them
+# SURFACE_VOID), so the layer bounds are the content inside that frame: SURFACE_BOUNDS.
+# cmd_build checks both against the cache and the renders.
+SURFACE_RENDER = [960, 2048, 4032, 4224]
+SURFACE_BOUNDS = [1016, 2104, 3976, 4168]
+SURFACE_VOID = (0x20, 0x2f, 0x3d)
 
 # Off-surface layers (DESIGN 3.3). Bounds are world tiles, [x0, y0, x1, y1),
 # region-aligned so one z=2 tile is exactly one region.
@@ -57,7 +65,7 @@ MARGIN = 8
 TRANSPORT_SPRITE = 1504  # SpriteID.Mapfunction.TRANSPORTATION, the fairy ring map icon
 
 LAYERS = [
-    # surface bounds are computed from the rings in plan_layers()
+    # surface bounds are SURFACE_BOUNDS, set in plan_layers()
     {"id": "surface", "name": "Gielinor", "bounds": None},
     {"id": "zanaris", "name": "Zanaris", "bounds": [2304, 4288, 2560, 4544]},
     # Abyssal Nexus (DIP) + the Abyss/Abyssal Area (ALR); the outer ring of the
@@ -120,18 +128,61 @@ def load_rings():
 
 
 def plan_layers(rings):
-    surf = [r for r in rings if r["layer"] == "surface"]
-    rx0 = min(r["x"] for r in surf) // REGION - SURFACE_MARGIN
-    rx1 = max(r["x"] for r in surf) // REGION + SURFACE_MARGIN + 1
-    ry0 = min(r["y"] for r in surf) // REGION - SURFACE_MARGIN
-    ry1 = max(r["y"] for r in surf) // REGION + SURFACE_MARGIN + 1
     layers = json.loads(json.dumps(LAYERS))
-    layers[0]["bounds"] = [rx0 * REGION, ry0 * REGION, rx1 * REGION, ry1 * REGION]
+    layers[0]["bounds"] = list(SURFACE_BOUNDS)
+    layers[0]["renderBounds"] = list(SURFACE_RENDER)
     return layers
 
 
+def check_surface_extent():
+    """The world map's surface squares (exported by MapGen) must be exactly SURFACE_BOUNDS."""
+    p = os.path.join(RAW, "worldmaps.json")
+    if not os.path.exists(p):
+        print("WARNING: %s missing; cannot check the surface extent" % p)
+        return
+    with open(p, encoding="utf-8") as f:
+        maps = json.load(f)
+    surf = [m for m in maps if m.get("surface")]
+    sq = {(s[2], s[3]) for m in surf for s in m.get("squares", [])}
+    want = set(regions_in(SURFACE_RENDER))
+    if sq != want:
+        print("WARNING: world map surface squares differ from SURFACE_BOUNDS: %d extra, %d missing"
+              % (len(sq - want), len(want - sq)))
+    else:
+        print("Surface extent: the world map's %d surface squares are exactly SURFACE_RENDER %s" % (len(sq), SURFACE_RENDER))
+
+
+def surface_content(z2):
+    """Bounding box of the non-void pixels of the rendered surface, in world tiles."""
+    x0 = y0 = 1 << 30
+    x1 = y1 = -1
+    for (rx, ry) in regions_in(SURFACE_RENDER):
+        a = z2.get((rx, ry))
+        if a is None:
+            continue
+        ys, xs = np.nonzero(np.any(a != np.array(SURFACE_VOID, dtype=np.uint8), axis=2))
+        if len(xs) == 0:
+            continue
+        x0 = min(x0, rx * REGION + xs.min() // 4)
+        x1 = max(x1, rx * REGION + xs.max() // 4 + 1)
+        y0 = min(y0, ry * REGION + 63 - ys.max() // 4)
+        y1 = max(y1, ry * REGION + 63 - ys.min() // 4 + 1)
+    return [int(v) for v in (x0, y0, x1, y1)]
+
+
+def paint_outside(z2, regs, b, colour):
+    """Paints the pixels of the given z=2 renders that lie outside bounds b with colour."""
+    for (rx, ry) in regs:
+        a = z2[(rx, ry)]
+        wx = rx * REGION + np.arange(256) // 4                 # per column
+        wy = ry * REGION + 63 - np.arange(256) // 4            # per row
+        outside = (~((wx >= b[0]) & (wx < b[2])))[None, :] | (~((wy >= b[1]) & (wy < b[3])))[:, None]
+        a[outside] = colour
+
+
 def regions_in(b):
-    return [(rx, ry) for ry in range(b[1] // REGION, b[3] // REGION) for rx in range(b[0] // REGION, b[2] // REGION)]
+    """The regions overlapping bounds b (which need not be region-aligned)."""
+    return [(rx, ry) for ry in range(b[1] // REGION, -(-b[3] // REGION)) for rx in range(b[0] // REGION, -(-b[2] // REGION))]
 
 
 def layer_regions(l):
@@ -159,7 +210,7 @@ def cmd_plan(_):
     ok = check_rings_in_layers(rings, layers)
     want = []
     seen = set()
-    for b in [l["bounds"] for l in layers] + EXTRA_RENDER:
+    for b in [l.get("renderBounds", l["bounds"]) for l in layers] + EXTRA_RENDER:
         for rc in regions_in(b):
             if rc not in seen:
                 seen.add(rc)
@@ -273,6 +324,7 @@ def cmd_build(args):
         plan = json.load(f)
     layers = plan_layers(load_rings())  # from code, not regions.json, so edits apply without re-rendering
     rings = load_rings()
+    check_surface_extent()
 
     # ---- load z=2 raw tiles per layer
     z2 = {}           # (rx,ry) -> array
@@ -322,13 +374,13 @@ def cmd_build(args):
             b = list(l["clip"])
         l["renderBounds"] = l["bounds"]
         l["bounds"] = b
-        # paint pixels outside b with the background
-        for (rx, ry) in regs:
-            a = z2[(rx, ry)]
-            wx = rx * REGION + np.arange(256) // 4                 # per column
-            wy = ry * REGION + 63 - np.arange(256) // 4            # per row
-            outside = (~((wx >= b[0]) & (wx < b[2])))[None, :] | (~((wy >= b[1]) & (wy < b[3])))[:, None]
-            a[outside] = bg[l["id"]]
+        paint_outside(z2, regs, b, bg[l["id"]])
+    # the surface: the void frame around the world map, outside its bounds, becomes open sea
+    surface = layers[0]
+    content = surface_content(z2)
+    if content != surface["bounds"]:
+        print("WARNING: surface content %s differs from SURFACE_BOUNDS %s" % (content, surface["bounds"]))
+    paint_outside(z2, [rc for rc in layer_regions(surface) if rc in z2], surface["bounds"], bg["surface"])
     for l in layers:
         print("  %-17s bounds %-28s background %s" % (l["id"], l["bounds"], l["background"]))
     if not check_rings_in_layers(rings, layers):
@@ -445,7 +497,7 @@ def cmd_build(args):
 def tighten_surface(surface, z2, sea, rings):
     """Regions to drop: no land within +-2 regions and further than 2 regions from any ring."""
     land = set()
-    for rc in regions_in(surface["bounds"]):
+    for rc in layer_regions(surface):
         a = z2.get(rc)
         if a is not None and solid_colour(a) is None:
             land.add(rc)
@@ -461,7 +513,7 @@ def tighten_surface(surface, z2, sea, rings):
         for dx in range(-2, 3):
             for dy in range(-2, 3):
                 keep.add((rx + dx, ry + dy))
-    drop = {rc for rc in regions_in(surface["bounds"]) if rc not in keep}
+    drop = {rc for rc in layer_regions(surface) if rc not in keep}
     print("Surface tighten: dropping %d regions" % len(drop))
     return drop
 
