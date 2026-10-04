@@ -26,7 +26,7 @@
       "codes": [
         {"code": "ALQ", "label": "Herbs: Port Phasmatys", "note": "Port Phasmatys herb patch (north)", "details": "Patches: herb, 2 allotments, flower"},
         {"code": "BLR", "label": "Herbs: Ardougne", "note": "Ardougne herb patch (north-west)", "details": "Patches: herb, 2 allotments, flower"},
-        {"code": "AKR", "label": "Herbs: Hosidius", "note": "Hosidius herb patch (west); vinery", "details": "Patches: 12 grape vines (vinery); herb, 2 allotments, flower, spirit tree (west)"},
+        {"code": "AKR", "label": "Herbs: Hosidius", "note": "Hosidius herb patch (west); vinery", "details": "Patches: 12 grape vines (vinery); west: herb, 2 allotments, flower, spirit tree"},
         {"code": "CIR", "label": "Farming Guild", "note": "Farming Guild: herbs, trees, Hespori", "details": "Patches: herb, 2 allotments, flower, bush, cactus, 5 trees (to redwood), anima, Hespori"},
         {"code": "AJP", "label": "Herbs: Ortus Farm", "note": "Ortus Farm herbs (NW); hardwood (SE)", "details": "Patches: herb, 2 allotments, flower (Ortus Farm); hardwood tree (Locus Oasis)"},
         {"code": "AIS", "label": "Tree: Nemus", "note": "Nemus tree patch; belladonna patch", "details": "Patches: tree (Nemus Retreat); belladonna (Auburnvale)"},

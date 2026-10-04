@@ -122,7 +122,7 @@ characters, the lowest-level or least-used entries were left off.
 |---|---|---|
 | ALQ | Patches: herb, 2 allotments, flower | `Allotment_patch/Patches` (west of Port Phasmatys). |
 | BLR | Patches: herb, 2 allotments, flower | `Allotment_patch/Patches` (north of Ardougne). |
-| AKR | Patches: 12 grape vines (vinery); herb, 2 allotments, flower, spirit tree (west) | `Special_patches/Patches` (grape, 12 patches, Hosidius Vinery). `Allotment_patch/Patches` (Hosidius). `Spirit_Tree_(Farming)/Patches` (Hosidius, 1693,3542, by the allotments). |
+| AKR | Patches: 12 grape vines (vinery); west: herb, 2 allotments, flower, spirit tree | `Special_patches/Patches` (grape, 12 patches, Hosidius Vinery). `Allotment_patch/Patches` (Hosidius). `Spirit_Tree_(Farming)/Patches` (south-west of Hosidius, 1693,3542: 42 W, 13 S of the allotments). The herb, allotments, flower and spirit tree are all west of the ring (91 to 133 tiles), so "west:" covers all four, as the compact card drops the note. |
 | CIR | Patches: herb, 2 allotments, flower, bush, cactus, 5 trees (to redwood), anima, Hespori | `Allotment_patch/Patches`, `Bush_patch/Patches`, `Special_patches/Patches` (cactus, anima, Hespori, celastrus, redwood), `Tree_patch/Patches`, `Fruit_tree_patch/Patches`, `Spirit_Tree_(Farming)/Patches`: all list the Farming Guild. The 5 trees are tree, fruit tree, spirit tree, celastrus and redwood. |
 | AJP | Patches: herb, 2 allotments, flower (Ortus Farm); hardwood tree (Locus Oasis) | `Allotment_patch/Patches` (Ortus Farm). `Special_patches/Patches` and `Locus_Oasis` (one hardwood patch). |
 | AIS | Patches: tree (Nemus Retreat); belladonna (Auburnvale) | `Tree_patch/Patches`, `Nemus_Retreat`. `Special_patches/Patches`, `Auburnvale`. |
