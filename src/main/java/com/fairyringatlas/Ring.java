@@ -20,8 +20,6 @@ import lombok.Setter;
 public class Ring
 {
 	public static final String KIND_DESTINATION = "destination";
-	/** A query that could be the start of a code: dial 1 letter, then dial 2, then dial 3. */
-	private static final java.util.regex.Pattern CODE_PREFIX = java.util.regex.Pattern.compile("^[a-d](?:[i-l][p-s]?)?$");
 	private static final java.util.regex.Pattern WORD_BREAK = java.util.regex.Pattern.compile("[^a-z0-9]+");
 
 	private String code;
@@ -143,10 +141,10 @@ public class Ring
 	}
 
 	/**
-	 * Whether the ring matches the travel log search. A query that could be the start of a code
-	 * ("c", "cl", "clr", or "c l r") matches only the codes that begin with it. Anything else
-	 * matches when every word typed is the start of a word in the ring's name, area, nearby places
-	 * or tags: "zul", "kq", "ice mount".
+	 * Whether the ring matches the travel log search. Up to three letters ("c", "cl", "clr", or
+	 * "c l r") are a code: only codes beginning with them match. Longer searches match when every
+	 * word typed is the start of a word in the ring's name, area, nearby places or tags:
+	 * "zulrah", "kalph", "ice mount".
 	 */
 	public boolean matches(String query)
 	{
@@ -156,7 +154,7 @@ public class Ring
 		}
 		String q = query.trim().toLowerCase(Locale.ROOT);
 		String compact = q.replace(" ", "");
-		if (CODE_PREFIX.matcher(compact).matches())
+		if (compact.length() <= 3)
 		{
 			return code != null && code.toLowerCase(Locale.ROOT).startsWith(compact);
 		}
