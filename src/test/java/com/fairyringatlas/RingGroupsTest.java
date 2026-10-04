@@ -304,6 +304,28 @@ public class RingGroupsTest
 	}
 
 	@Test
+	public void groupsSavedBeforeRowLabelsGetTheBundledOnes()
+	{
+		// the saved form from before row labels: a reordered prebuilt group and one of the player's own
+		String saved = "{\"groups\":[{\"id\":\"slayer\",\"codes\":[\"CKS\",\"AJR\",\"DKS\"]},"
+			+ "{\"id\":\"u1\",\"name\":\"Bossing\",\"codes\":[\"AKQ\"]}],\"seen\":[\"farming\",\"slayer\"]}";
+		RingGroups g = RingGroups.parse(GSON, defaults(), saved);
+		RingGroups.Group s = group(g, "slayer");
+		assertEquals(Arrays.asList("CKS", "AJR", "DKS"), s.getCodes());
+		assertEquals("Slayer cave", s.getLabels().get("AJR"));
+		assertEquals("Kalphite Lair", s.getLabels().get("CKS"));
+		assertTrue(s.getRenamed().isEmpty());
+		assertTrue(s.isModified());
+		assertTrue(group(g, "u1").getLabels().isEmpty());
+		// the farming group, deleted then, stays deleted
+		assertNull(group(g, "farming"));
+		// and saving it again adds nothing for the labels
+		assertFalse(g.format(GSON).contains("labels"));
+		assertTrue(g.reset("slayer"));
+		assertFalse(group(g, "slayer").isModified());
+	}
+
+	@Test
 	public void unreadableSavedStateFallsBackToDefaults()
 	{
 		assertEquals(2, RingGroups.parse(GSON, defaults(), "{not json").view().size());
