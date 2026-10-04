@@ -49,7 +49,11 @@ reviewer rulings. Breaking one gets the plugin rejected.
    of Fairy Ring Map.
    - Never unhide a component the game hid. Restore only what we changed
      ourselves.
-   - Never move CONFIRM, the close button, or the top-level modal containers.
+   - In map mode, CONFIRM (Teleport), its plaque `ROOT_MODEL25` and the close
+     button `ROOT_GRAPHIC27` may be moved, only inside the dials' own 512x334
+     rectangle (`MOVED_IN_MAP`). Their ops and scripts are untouched, and each
+     is put back exactly when map mode ends. Never move anything else of 398's,
+     or the top-level modal containers.
 5. **No network access at runtime.** All imagery and data are bundled.
 6. **Image budget.** The hub bot rejects any bundled image whose decoded size
    (w*h*4) is about 1 MiB or more. Every bundled PNG is therefore at most
@@ -301,11 +305,18 @@ default (config `openInMapMode`). The overlay draws only while 398 is open.
 - **Map mode.** The map covers the dial interface.
   - We hide these 398 components: ornaments 1/18, title text 2, dial models
     3-17 and the six rotate zones 19-24.
-  - We keep `ROOT_RECT0`, `ROOT_MODEL25`, CONFIRM and the close button.
-  - The overlay leaves **holes** over CONFIRM and the close button. Inside a
-    hole nothing is drawn and no input is consumed, so the real widgets show
-    and work. Each hole gets a thin frame and a drop shadow so it reads as a
-    button on the map.
+  - We keep `ROOT_RECT0`, `ROOT_MODEL25`, CONFIRM and the close button, and
+    move the last three into the dials' bottom-right corner, which is also the
+    map's (`MOVED_IN_MAP`; see "In-game feedback" at the end). They are put
+    back exactly with the hides.
+  - The overlay leaves **holes** over the close button always, and over
+    CONFIRM only while `Scene.teleportShown()`: the dials show the selected
+    ring or, with nothing selected, a real destination. Otherwise the map
+    covers CONFIRM with a disabled stand-in that owns its clicks and says what
+    to do (4.5). Inside a hole nothing is drawn, the travel-log leader
+    included, and no input is consumed, so the real widgets show and work.
+    Each hole gets a thin frame and a drop shadow so it reads as a button on
+    the map.
   - Re-apply the hides on `WidgetLoaded(398)`, `ScriptPostFired(400)` and a
     cheap per-tick check. Restore everything we hid when leaving Map mode, when
     398 closes, and on shutdown.
@@ -334,13 +345,14 @@ default (config `openInMapMode`). The overlay draws only while 398 is open.
      the side panel's left edge;
    - minus the chatbox: limit `avail.bottom` to the chatbox top `- 6`. Use the
      chatbox's live bounds if it is visible.
-2. Size the map `W×H` = min(config `maxWidth` (default 1100), avail.w) by
-   min(config `maxHeight` (default 720), avail.h).
+2. The map grows up and left from the dials' bottom-right corner, where
+   Teleport and the close button are moved. Size it `W×H` = min(config
+   `maxWidth` (default 1100), dials' right - avail.left) by min(config
+   `maxHeight` (default 720), dials' bottom - avail.top).
 3. Never make it smaller than the dial rect (512x334). If `avail` is smaller
    than that, use the dial rect.
-4. Centre the map on the dial's centre, then shift it to lie inside `avail`.
-5. The dial rect must lie inside the map. If it cannot, grow or shift the map
-   to contain it, because the holes must fall inside the map.
+4. Its right and bottom edges are the dials' own, so the dial rect, and with
+   it every hole, always lies inside the map.
 
 **Fixed mode** (`!client.isResized()`): the map rect equals the dial rect.
 
@@ -378,8 +390,10 @@ about 150 px wide. It can be collapsed to a 20 px tab.
 **Info card.** It describes the hovered ring, or the selected ring when
 nothing is hovered.
 
-- **Position:** anchored bottom-left inside the map. It must stay clear of the
-  CONFIRM hole: if it would overlap, use the bottom-right corner.
+- **Position:** anchored bottom-left inside the map, else bottom-right,
+  top-right or top-left (`ChromePainter.place`). It must stay clear of the
+  holes and of Teleport's slot, shown or covered (`Scene.blockers()`), which
+  sit in the bottom-right corner; failing every corner, it slides off them.
 - **Contents:**
   - code, name and area;
   - status: visited (in your travel log) or not, plus star / last-destination
@@ -471,9 +485,15 @@ marker) does the following:
   2. Draw a pulsing highlight rectangle around the row's on-screen bounds.
      This drawing must not consume input.
   3. Draw a curved leader arrow from the info card (or the map edge nearest
-     the log) to the row.
+     the log) to the row. It passes under the holes and Teleport's slot.
   4. The next-step line reads: "Click the highlighted code in your travel
      log, then Teleport."
+- **The covered Teleport answers the click.** Until the dials match, the
+  stand-in in Teleport's place reads "Teleport to CODE" over the step that
+  sets the dials (`Scene.teleportStandIn`): "Click it in the travel log",
+  "Use it in the travel log first", "Clear the log search first" or "Locked:
+  dial it by hand". With nothing selected it reads "Teleport" / "Pick a ring
+  on the map". The map click itself never sets the dials (hard rule 2).
 - **Else** (not visited): the next-step line reads "Not in your travel log
   yet — dial it: A ↻1 · I ✓ · Q ↺1", followed by a **[Show dials]** button.
 
@@ -688,8 +708,10 @@ Group `fairyringatlas`. Sections: Map, Markers, Travel log, Advanced.
 ### 4.11 Coexistence with other plugins
 
 **Core Fairy Rings** rewrites the CONFIRM text and adds "Edit Tags" entries.
-That is fine: we never touch CONFIRM, and our `PostMenuSort` only strips
-entries under the map, never on the log.
+That is fine: we never touch CONFIRM's text or ops (only its place in map
+mode, and it keeps at least 35 px of height so the game still wraps a long
+destination name onto two lines), and our `PostMenuSort` only strips entries
+under the map, never on the log.
 
 **Fairy Ring Organizer** may re-sort rows. Our row edits are re-applied after
 8080 and restored exactly.
@@ -1026,20 +1048,32 @@ default font when `FontManager` is unavailable).
   dials' own 512x334 rectangle, so the map now grows up and left from the dials' bottom-right
   corner. Map mode moves three components into that corner and puts each back exactly when
   leaving map mode:
-  - CONFIRM to (335,299) 169x27;
-  - the parchment plaque behind it (ROOT_MODEL25) to (404,297);
-  - the close button (ROOT_GRAPHIC27) to (478,268), just above Teleport.
+  - CONFIRM to (335,290) 169x36;
+  - the parchment plaque behind it (ROOT_MODEL25) to (404,292), centred on it;
+  - the close button (ROOT_GRAPHIC27) to (478,259), just above Teleport.
+
+  CONFIRM keeps at least 35 px of height (`CONFIRM_MIN_H`). Its font, q8_full, has ascent 15,
+  max ascent 15 and max descent 5, and the game turns off line breaking when a text component is
+  shorter than both 15+15+5 and 2x15. At the first size, 169x27, core Fairy Rings' long names
+  ("Mort Myre Swamp, south of Canifis", 244 px) were drawn on one line and cut off at both ends.
 
   The user chose this over a map only 334 px tall, which would have kept close at the top right.
 
-  This revises hard rule 4's "never move CONFIRM or the close button". Jagex's rules restrict
+  This revised hard rule 4, which used to say "never move CONFIRM or the close button" and
+  now names what may be moved. Jagex's rules restrict
   moving click zones only for the inventory, equipment, spellbook, prayer, combat options and 3D
   components. Moving the real widget is the precedent reviewers accept: Fairy Ring Map's
   travel-log rows, and plugin-hub #16240. The ops are untouched.
 - **Teleport is covered unless worth pressing.** Teleport is a hole only when the dials show
   the selected ring or, with nothing selected, a real destination (`Scene.teleportShown`).
-  Otherwise the bar draws a disabled "Teleport" in its place and owns its clicks, so a
+  Otherwise the map draws a disabled stand-in in its place and owns its clicks, so a
   stale or invalid code can't be used by mistake.
+- **The stand-in answers a map click.** The user expected clicking a ring on the map to change
+  the Teleport button. A map click cannot set the dials (hard rule 2: the travel log's "Use code"
+  or the rotate zones do that), but the stand-in now changes with the selection: "Teleport to
+  CODE" over the step that sets the dials, e.g. "Click it in the travel log" (4.5).
+- **The travel-log leader passes under the corner buttons.** Its arc from the card to the log
+  can cross the map's bottom-right corner, so it is clipped off the holes and Teleport's slot.
 - **Open at your ring** (`openAt`, default AROUND_YOU): the map opens centred on the ring
   you are standing at, or on the area you are in.
 - **No mouse-over text over the map.** While the map shows, the game's top-left mouse-over

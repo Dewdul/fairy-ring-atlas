@@ -18,6 +18,7 @@ import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -371,6 +372,26 @@ public class RingDataTest
 		assertTrue(s.teleportShown());
 		s.dials = null;
 		assertFalse(s.teleportShown());
+	}
+
+	@Test
+	public void coveredTeleportSaysWhatAMapClickChanged()
+	{
+		Scene s = new Scene();
+		s.repo = real();
+		s.repo.setState(new HashSet<>(Arrays.asList("AIQ")), new java.util.HashMap<>(), null);
+		s.dials = DialMath.values("AIP");
+		assertArrayEquals(new String[]{"Teleport", "Pick a ring on the map"}, s.teleportStandIn());
+		// a map click selects; the stand-in names the ring and the step that sets the dials
+		s.selected = "AIQ";
+		s.rowVisible = true;
+		assertArrayEquals(new String[]{"Teleport to AIQ", "Click it in the travel log"}, s.teleportStandIn());
+		s.rowVisible = false;
+		assertArrayEquals(new String[]{"Teleport to AIQ", "Use it in the travel log first"}, s.teleportStandIn());
+		s.query = "zul";
+		assertArrayEquals(new String[]{"Teleport to AIQ", "Clear the log search first"}, s.teleportStandIn());
+		s.selected = "CKS";
+		assertArrayEquals(new String[]{"Teleport to CKS", "Locked: dial it by hand"}, s.teleportStandIn());
 	}
 
 	@Test

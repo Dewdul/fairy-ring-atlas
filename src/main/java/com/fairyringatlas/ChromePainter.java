@@ -1011,9 +1011,14 @@ public class ChromePainter
 		g.drawRect(slot.x - 1, slot.y - 1, slot.width + 1, slot.height + 1);
 		g.setColor(BRONZE);
 		g.drawRect(slot.x - 3, slot.y - 3, slot.width + 5, slot.height + 5);
-		String t = "Teleport";
-		ink.text(g, t, ink.bold, GREY, slot.x + (slot.width - ink.width(ink.bold, t)) / 2,
-			slot.y + (slot.height - ink.height(ink.bold)) / 2, Ink.Style.SHADOW);
+		// it says where it would go and what sets the dials, so selecting a ring visibly changes it
+		String[] t = s.teleportStandIn();
+		String title = ink.fit(t[0], ink.bold, slot.width - 8);
+		String why = ink.fit(t[1], ink.small, slot.width - 8);
+		int y = slot.y + (slot.height - ink.height(ink.bold) - ink.height(ink.small)) / 2;
+		ink.text(g, title, ink.bold, GREY, slot.x + (slot.width - ink.width(ink.bold, title)) / 2, y, Ink.Style.SHADOW);
+		ink.text(g, why, ink.small, s.selected == null ? GREY : HINT, slot.x + (slot.width - ink.width(ink.small, why)) / 2,
+			y + ink.height(ink.bold), Ink.Style.SHADOW);
 		s.hits.add(new Hit(Hit.Kind.BLOCK, AtlasPainter.grow(slot, 3), null, null, null, null));
 	}
 

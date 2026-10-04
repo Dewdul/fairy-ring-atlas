@@ -170,6 +170,11 @@ public class MapViewTest
 		{
 			Rectangle moved = new Rectangle(dial.x + m[1], dial.y + m[2], m[3], m[4]);
 			assertTrue(dial.contains(moved));
+			if (m[0] == net.runelite.api.gameval.InterfaceID.Fairyrings.CONFIRM)
+			{
+				// tall enough that the game still wraps long destination names onto two lines
+				assertTrue(m[4] >= FairyRingAtlasPlugin.CONFIRM_MIN_H);
+			}
 			if (m[0] != net.runelite.api.gameval.InterfaceID.Fairyrings.ROOT_MODEL25)
 			{
 				assertTrue(corner.contains(moved));
@@ -212,5 +217,46 @@ public class MapViewTest
 			assertTrue(at, !r.intersects(log));
 			assertTrue(at, canvas.contains(r));
 		}
+	}
+
+	/**
+	 * Fixed mode, card at the map's bottom-left and a mid-list log row: the leader's arc crosses the
+	 * close button in the map's bottom-right corner, and must pass under it rather than over it.
+	 */
+	@Test
+	public void travelLogLeaderPassesUnderTheCornerButtons()
+	{
+		Rectangle card = new Rectangle(36, 172, 230, 160);
+		Rectangle row = new Rectangle(550, 295, 180, 18);
+		int[] c = FairyRingAtlasPlugin.MOVED_IN_MAP[2];
+		Rectangle close = new Rectangle(4 + c[1], 4 + c[2], c[3], c[4]);
+		java.awt.image.BufferedImage plain = leader(row, card, Collections.emptyList());
+		java.awt.image.BufferedImage avoiding = leader(row, card, Collections.singletonList(close));
+		assertTrue(inked(plain, close) > 0);
+		assertEquals(0, inked(avoiding, AtlasPainter.grow(close, 3)));
+		// the rest of the leader is still drawn
+		assertTrue(inked(avoiding, new Rectangle(300, 200, 150, 120)) > 0);
+	}
+
+	private static java.awt.image.BufferedImage leader(Rectangle row, Rectangle card, java.util.List<Rectangle> avoid)
+	{
+		java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(800, 500, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		java.awt.Graphics2D g = img.createGraphics();
+		AtlasOverlay.paintRowHighlight(g, row, card, avoid, java.awt.Color.ORANGE, 0);
+		g.dispose();
+		return img;
+	}
+
+	private static int inked(java.awt.image.BufferedImage img, Rectangle r)
+	{
+		int n = 0;
+		for (int y = r.y; y < r.y + r.height; y++)
+		{
+			for (int x = r.x; x < r.x + r.width; x++)
+			{
+				n += (img.getRGB(x, y) >>> 24) != 0 ? 1 : 0;
+			}
+		}
+		return n;
 	}
 }

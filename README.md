@@ -20,7 +20,7 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 ## How to use it
 
 1. Use a fairy ring. The map opens over the dials, centred on the ring you are standing at. The real **Teleport** and close buttons sit in the map's bottom-right corner. Teleport is greyed out until the dials show your chosen ring, so you can't teleport somewhere else by mistake.
-2. **Click a ring** to select it. The card at the bottom then tells you the next step:
+2. **Click a ring** to select it. The greyed-out Teleport now reads *Teleport to* its code, and it and the card tell you the next step:
    - **The ring is in your travel log.** The log is narrowed to that code and its row is highlighted. Click the row (*Use code*), then click **Teleport**. If you click a row in the log yourself, the map follows and the log is left as it is.
    - **The ring is not in your travel log yet.** Click **Show dials**. Arrows on the real dials show which way to turn each one and how many times. Turn the dials, then click **Teleport**. The **Map** button takes you back to the map.
    - **The dials already show the code.** The card reads *Ready: click Teleport* and the Teleport button pulses.
@@ -34,7 +34,7 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 
 ### Why clicking the map doesn't teleport you
 
-RuneLite plugins may not act in the game for you. They can't send clicks, turn dials or choose a travel log entry. A click on the map therefore only selects a ring. The plugin then highlights the real log row, or shows you the dial turns, and you make those clicks yourself. The plugin changes the fairy ring interfaces only while they are open: it hides the dials under the map, and narrows and recolours the travel log (in map or dial mode). Under the map it also removes the game's own right-click options, such as *Walk here*. It puts everything back when you close the interface.
+RuneLite plugins may not act in the game for you. They can't send clicks, turn dials or choose a travel log entry. A click on the map therefore only selects a ring. The plugin then highlights the real log row, or shows you the dial turns, and you make those clicks yourself: the travel log row (or the dials) is what sets the code for **Teleport**. The plugin changes the fairy ring interfaces only while they are open: it hides the dials under the map, and narrows and recolours the travel log (in map or dial mode). Under the map it also removes the game's own right-click options, such as *Walk here*. It puts everything back when you close the interface.
 
 ## Settings
 

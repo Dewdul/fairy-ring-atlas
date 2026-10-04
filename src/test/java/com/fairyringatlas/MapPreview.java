@@ -213,7 +213,7 @@ public class MapPreview
 		g.setColor(new Color(0xC8B48A));
 		g.fill(confirm);
 		g.setColor(new Color(0x402000));
-		g.drawString("Teleport to this location", confirm.x + 18, confirm.y + 18);
+		g.drawString("Teleport to this location", confirm.x + 18, confirm.y + confirm.height / 2 + 5);
 		g.setColor(new Color(0x8a2a1a));
 		g.fill(close);
 

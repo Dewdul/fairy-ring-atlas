@@ -116,7 +116,7 @@ public class AtlasOverlay extends Overlay
 			renderDialMode(g, selected, ready);
 			if (row != null)
 			{
-				paintRowHighlight(g, row, null);
+				paintRowHighlight(g, row, null, java.util.Collections.emptyList(), config.selectedColor(), scene.now);
 			}
 			return null;
 		}
@@ -167,7 +167,7 @@ public class AtlasOverlay extends Overlay
 		chrome.paintHoles(g, scene, ready);
 		if (row != null)
 		{
-			paintRowHighlight(g, row, scene.card != null ? scene.card : rect);
+			paintRowHighlight(g, row, scene.card != null ? scene.card : rect, scene.blockers(), config.selectedColor(), scene.now);
 		}
 		plugin.publish(new ArrayList<>(scene.hits), holes, scene.panel, chrome.panelScrollMax, null);
 		return null;
@@ -246,12 +246,15 @@ public class AtlasOverlay extends Overlay
 
 	// ------------------------------------------------------------------ travel log row
 
-	/** A pulsing outline around the row to click, and a curved leader from the card or map edge. */
-	private void paintRowHighlight(Graphics2D g, Rectangle row, Rectangle from)
+	/**
+	 * A pulsing outline around the row to click, and a curved leader from the card or map edge.
+	 * The leader passes under {@code avoid} (the holes and Teleport's slot, with their frames):
+	 * its way from the card to the log can cross the map's bottom-right corner.
+	 */
+	static void paintRowHighlight(Graphics2D g, Rectangle row, Rectangle from, List<Rectangle> avoid, Color c, long now)
 	{
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		Color c = config.selectedColor();
-		double t = 0.5 + 0.5 * Math.sin(System.currentTimeMillis() / 180.0);
+		double t = 0.5 + 0.5 * Math.sin(now / 180.0);
 		Rectangle r = AtlasPainter.grow(row, 2);
 		g.setStroke(new BasicStroke(4f));
 		g.setColor(new Color(0, 0, 0, 120));
@@ -286,13 +289,20 @@ public class AtlasOverlay extends Overlay
 		double mx = (sx + ex) / 2;
 		double my = Math.min(sy, ey) - Math.abs(ex - sx) * 0.25;
 		QuadCurve2D curve = new QuadCurve2D.Double(sx, sy, mx, my, ex, ey);
+		Shape oldClip = g.getClip();
+		Area clip = new Area(AtlasPainter.grow(curve.getBounds(), 12));
+		for (Rectangle h : avoid)
+		{
+			clip.subtract(new Area(AtlasPainter.grow(h, 3)));
+		}
+		g.clip(clip);
 		g.setColor(new Color(0, 0, 0, 140));
 		g.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 		g.draw(curve);
 		g.setColor(AtlasPainter.withAlpha(c, 230));
 		// the dashes march toward the row; a dash phase must not be negative, so it counts
 		// down through one dash period (6 + 4)
-		g.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10, new float[]{6f, 4f}, 10f - (System.currentTimeMillis() % 1000) / 100f));
+		g.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10, new float[]{6f, 4f}, 10f - (now % 1000) / 100f));
 		g.draw(curve);
 		double ang = Math.atan2(ey - my, ex - mx);
 		Path2D head = new Path2D.Double();
@@ -301,6 +311,7 @@ public class AtlasOverlay extends Overlay
 		head.lineTo(ex - Math.cos(ang + 0.45) * 9, ey - Math.sin(ang + 0.45) * 9);
 		head.closePath();
 		g.fill(head);
+		g.setClip(oldClip);
 	}
 
 	// ------------------------------------------------------------------ dial mode

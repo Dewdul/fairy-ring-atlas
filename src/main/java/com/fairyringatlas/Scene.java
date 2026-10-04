@@ -124,4 +124,28 @@ public final class Scene
 		Ring r = repo == null ? null : repo.ring(dialledCode());
 		return r != null && r.isDialable();
 	}
+
+	/**
+	 * The two lines the covered Teleport's stand-in shows: where it would go, and what sets the
+	 * dials. A map click only selects (hard rule 2), so this is how the button answers it.
+	 */
+	public String[] teleportStandIn()
+	{
+		Ring r = repo == null ? null : repo.ring(selected);
+		if (r == null)
+		{
+			return new String[]{"Teleport", "Pick a ring on the map"};
+		}
+		String title = "Teleport to " + r.getCode();
+		if (!r.isDialable())
+		{
+			return new String[]{title, "It has no code to dial"};
+		}
+		if (repo.hasLogRow(r.getCode()))
+		{
+			return new String[]{title, rowVisible ? "Click it in the travel log"
+				: searching() ? "Clear the log search first" : "Use it in the travel log first"};
+		}
+		return new String[]{title, "Locked: dial it by hand"};
+	}
 }

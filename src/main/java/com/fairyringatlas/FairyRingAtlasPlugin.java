@@ -105,12 +105,16 @@ public class FairyRingAtlasPlugin extends Plugin
 	 * height). The map's bottom-right corner is the dials' own, so Teleport (with the parchment
 	 * plaque drawn behind it) goes in that corner and the close button just above it, instead of
 	 * sitting in the middle of the map. The game draws and clicks them only inside the dials.
+	 * Teleport keeps at least {@link #CONFIRM_MIN_H} px of height: below that the game draws its
+	 * q8_full text on one line, and core Fairy Rings' longer destination names would be cut off.
 	 */
 	static final int[][] MOVED_IN_MAP = {
-		{InterfaceID.Fairyrings.CONFIRM, 335, 299, 169, 27},
-		{InterfaceID.Fairyrings.ROOT_MODEL25, 404, 297, 32, 32},
-		{InterfaceID.Fairyrings.ROOT_GRAPHIC27, 478, 268, 26, 23},
+		{InterfaceID.Fairyrings.CONFIRM, 335, 290, 169, 36},
+		{InterfaceID.Fairyrings.ROOT_MODEL25, 404, 292, 32, 32},
+		{InterfaceID.Fairyrings.ROOT_GRAPHIC27, 478, 259, 26, 23},
 	};
+	/** q8_full: ascent 15 + max ascent 15 + max descent 5; the game wraps text only at this height. */
+	static final int CONFIRM_MIN_H = 35;
 	/** Rotate zones per dial: clockwise, anticlockwise. */
 	static final int[][] ZONES = {
 		{InterfaceID.Fairyrings._1_CLOCKWISE, InterfaceID.Fairyrings._1_ANTICLOCKWISE},
