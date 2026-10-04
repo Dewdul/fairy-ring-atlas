@@ -77,6 +77,19 @@ public class ChromePainter
 		{
 			s.panel = new Rectangle(v.getX() + 6, top, PANEL_W, v.getY() + v.getH() - 6 - top);
 		}
+		Layer layer = s.repo.layer(v.getLayer());
+		s.backButton = null;
+		if (layer != null && !layer.isSurface())
+		{
+			int left = s.panel != null ? s.panel.x + s.panel.width + 8 : v.getX() + 8;
+			int w = ink.width(ink.bold, backLabel(s)) + 30;
+			s.backButton = new Rectangle(left, top, w, ink.height(ink.bold) + 12);
+		}
+	}
+
+	private static String backLabel(Scene s)
+	{
+		return "Back to " + s.repo.surface().getName();
 	}
 
 	/**
@@ -102,6 +115,7 @@ public class ChromePainter
 			int mark = s.hits.size();
 			paintPanel(lg, s);
 			paintTopBar(lg, s);
+			paintBackButton(lg, s);
 			paintCard(lg, s);
 			paintTeleportStandIn(lg, s);
 			paintFrame(lg, s);
@@ -203,8 +217,7 @@ public class ChromePainter
 		{
 			int w = ink.width(ink.small, surface.getName()) + 20;
 			Rectangle b = new Rectangle(x, by, w, BUTTON_H);
-			button(g, s, b, surface.getName(), Hit.BACK, "Back to", surface.getName());
-			triangle(g, b.x + 7, b.y + b.height / 2.0, 3.5, false, CREAM);
+			accentButton(g, s, b, surface.getName(), ink.small, Hit.BACK, "Back to", surface.getName());
 			x = b.x + b.width + 6;
 			triangle(g, x + 3, bar.y + bar.height / 2.0, 3.5, true, GREY);
 			x = text(g, layer.getName(), ink.bold, TITLE, x + 10, ty, right);
@@ -243,6 +256,37 @@ public class ChromePainter
 			text(g, s.notice, ink.small, Color.WHITE, strip.x + 6, strip.y + (18 - ink.height(ink.small)) / 2, strip.x + strip.width - 6);
 			s.hits.add(new Hit(Hit.Kind.BLOCK, strip, null, null, null, null));
 		}
+	}
+
+	/** On an off-surface map: a large, unmissable way back to the world map. */
+	private void paintBackButton(Graphics2D g, Scene s)
+	{
+		Rectangle b = s.backButton;
+		if (b == null)
+		{
+			return;
+		}
+		g.setColor(new Color(0, 0, 0, 110));
+		g.fillRoundRect(b.x + 2, b.y + 3, b.width, b.height, 10, 10);
+		accentButton(g, s, b, backLabel(s), ink.bold, Hit.BACK, "Back to", s.repo.surface().getName());
+	}
+
+	/** A button in the highlight colour, with a back arrow: the way out of an off-surface map. */
+	private void accentButton(Graphics2D g, Scene s, Rectangle b, String label, Font f, String id, String option, String target)
+	{
+		boolean hover = s.mouse != null && b.contains(s.mouse);
+		g.setColor(FRAME);
+		g.fillRoundRect(b.x - 1, b.y - 1, b.width + 2, b.height + 2, 8, 8);
+		g.setColor(hover ? new Color(0xFFB04A) : new Color(0xE0841A));
+		g.fillRoundRect(b.x, b.y, b.width, b.height, 7, 7);
+		g.setColor(hover ? Color.WHITE : new Color(0xFFD08A));
+		g.drawRoundRect(b.x, b.y, b.width - 1, b.height - 1, 7, 7);
+		double cy = b.y + b.height / 2.0;
+		double ar = Math.max(3.5, b.height * 0.2);
+		triangle(g, b.x + 6 + ar, cy, ar, false, Ink.DARK);
+		int tx = b.x + (int) (10 + ar * 2);
+		ink.text(g, label, f, Ink.DARK, tx, b.y + (b.height - ink.height(f)) / 2, Ink.Style.PLAIN);
+		s.hits.add(new Hit(Hit.Kind.BUTTON, b, null, id, option, target));
 	}
 
 	private void button(Graphics2D g, Scene s, Rectangle b, String label, String id, String option, String target)

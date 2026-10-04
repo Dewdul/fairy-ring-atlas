@@ -263,6 +263,7 @@ public class AtlasPainter
 		placer.addObstacle(s.topBar);
 		placer.addObstacle(s.panel);
 		placer.addObstacle(s.card);
+		placer.addObstacle(s.backButton);
 		for (Rectangle h : s.blockers())
 		{
 			placer.addObstacle(grow(h, 4));

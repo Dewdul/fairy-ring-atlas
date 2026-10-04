@@ -75,6 +75,8 @@ public final class Scene
 	public Rectangle card;
 	public Rectangle panel;
 	public Rectangle topBar;
+	/** The large "Back to Gielinor" button on off-surface maps; null on the surface. */
+	public Rectangle backButton;
 
 	/** The holes plus Teleport's slot when it is covered: places the card and labels keep clear of. */
 	public List<Rectangle> blockers()
