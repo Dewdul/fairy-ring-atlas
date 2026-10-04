@@ -102,12 +102,14 @@ public class FairyRingAtlasPlugin extends Plugin
 	};
 	/**
 	 * Components of 398 moved in map mode, with their place inside the dials (x, y, width,
-	 * height): Teleport and the parchment plaque drawn behind it go to the top bar, just left of
-	 * the close button, instead of sitting in the middle of the map.
+	 * height). The map's bottom-right corner is the dials' own, so Teleport (with the parchment
+	 * plaque drawn behind it) goes in that corner and the close button just above it, instead of
+	 * sitting in the middle of the map. The game draws and clicks them only inside the dials.
 	 */
 	static final int[][] MOVED_IN_MAP = {
-		{InterfaceID.Fairyrings.CONFIRM, 299, 5, 169, 27},
-		{InterfaceID.Fairyrings.ROOT_MODEL25, 368, 2, 32, 32},
+		{InterfaceID.Fairyrings.CONFIRM, 335, 299, 169, 27},
+		{InterfaceID.Fairyrings.ROOT_MODEL25, 404, 297, 32, 32},
+		{InterfaceID.Fairyrings.ROOT_GRAPHIC27, 478, 268, 26, 23},
 	};
 	/** Rotate zones per dial: clockwise, anticlockwise. */
 	static final int[][] ZONES = {

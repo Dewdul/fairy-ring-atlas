@@ -162,11 +162,19 @@ public class MapViewTest
 		assertTrue(r.width <= 1100 && r.height <= 720);
 		assertTrue(r.x >= 6 && r.y >= 6);
 		assertTrue(r.width >= 900);
-		// hung from the dials' top-right corner: the close button ends up in the top bar's corner
-		assertEquals(dial.y, r.y);
+		// grown from the dials' bottom-right corner: the moved Teleport and close sit in that corner
+		assertEquals(dial.y + dial.height, r.y + r.height);
 		assertEquals(dial.x + dial.width, r.x + r.width);
-		Rectangle close = new Rectangle(dial.x + 476, dial.y + 10, 26, 23);
-		assertTrue(new Rectangle(r.x, r.y, r.width, ChromePainter.BAR_H).contains(close));
+		Rectangle corner = new Rectangle(r.x + r.width - 190, r.y + r.height - 75, 190, 75);
+		for (int[] m : FairyRingAtlasPlugin.MOVED_IN_MAP)
+		{
+			Rectangle moved = new Rectangle(dial.x + m[1], dial.y + m[2], m[3], m[4]);
+			assertTrue(dial.contains(moved));
+			if (m[0] != net.runelite.api.gameval.InterfaceID.Fairyrings.ROOT_MODEL25)
+			{
+				assertTrue(corner.contains(moved));
+			}
+		}
 	}
 
 	@Test

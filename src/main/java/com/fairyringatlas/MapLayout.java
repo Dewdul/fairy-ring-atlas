@@ -14,8 +14,9 @@ import net.runelite.api.widgets.Widget;
 
 /**
  * Where the map goes. Fixed mode: exactly over the dial interface. Resizable: as large as the
- * config allows, growing left and down from the dials' top-right corner (where the close button
- * is), clear of the chatbox, the side panel and the travel log, and never smaller than the dials.
+ * config allows, growing up and left from the dials' bottom-right corner (where Teleport and the
+ * close button are moved), clear of the chatbox, the side panel and the travel log, and never
+ * smaller than the dials.
  */
 public final class MapLayout
 {
@@ -136,10 +137,10 @@ public final class MapLayout
 			bottom = cut[3];
 		}
 
-		// the map hangs from the dials' top-right corner, so the real close button (and Teleport,
-		// moved beside it) sit at the right end of the map's top bar rather than mid-map
+		// the map grows up and left from the dials' bottom-right corner: Teleport and the close
+		// button, which the game shows only inside the dials, are moved into that corner
 		int w = Math.max(dial.width, Math.min(maxW, dialRight - left));
-		int h = Math.max(dial.height, Math.min(maxH, bottom - dial.y));
-		return new Rectangle(dialRight - w, dial.y, w, h);
+		int h = Math.max(dial.height, Math.min(maxH, dialBottom - top));
+		return new Rectangle(dialRight - w, dialBottom - h, w, h);
 	}
 }

@@ -174,12 +174,13 @@ public class MapPreview
 		TileStore tiles = new TileStore(repo.getIndex(), repo.getLayers(), BASE, Runnable::run);
 		ChromePainter chrome = new ChromePainter(painter.ink());
 		Rectangle rect = v.rect();
-		// the map hangs from the dials' top-right corner; close and the moved Teleport are holes
+		// the map grows from the dials' bottom-right corner; the moved Teleport and close are holes
 		int dx = rect.x + rect.width - 512;
-		int dy = rect.y;
+		int dy = rect.y + rect.height - 334;
 		int[] m = FairyRingAtlasPlugin.MOVED_IN_MAP[0];
+		int[] c = FairyRingAtlasPlugin.MOVED_IN_MAP[2];
 		Rectangle confirm = new Rectangle(dx + m[1], dy + m[2], m[3], m[4]);
-		Rectangle close = new Rectangle(dx + 476, dy + 10, 26, 23);
+		Rectangle close = new Rectangle(dx + c[1], dy + c[2], c[3], c[4]);
 
 		Scene s = new Scene();
 		s.repo = repo;

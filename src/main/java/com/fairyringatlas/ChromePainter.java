@@ -26,9 +26,8 @@ import java.util.List;
  */
 public class ChromePainter
 {
-	/** Tall enough to hold the game's close button and Teleport, which sit at its right end. */
-	static final int BAR_H = 36;
-	private static final int BUTTON_H = 20;
+	static final int BAR_H = 22;
+	private static final int BUTTON_H = 16;
 	static final int PANEL_W = 150;
 	static final int CARD_W = 340;
 	static final int CARD_MAX_H = 260;
@@ -102,6 +101,7 @@ public class ChromePainter
 			paintPanel(lg, s);
 			paintTopBar(lg, s);
 			paintCard(lg, s);
+			paintTeleportStandIn(lg, s);
 			paintFrame(lg, s);
 			lg.dispose();
 			layerHits.clear();
@@ -169,22 +169,6 @@ public class ChromePainter
 			if (h.intersects(bar))
 			{
 				right = Math.min(right, h.x - 6);
-			}
-		}
-		Rectangle slot = s.teleportSlot;
-		if (slot != null && slot.intersects(bar))
-		{
-			right = Math.min(right, slot.x - 8);
-			if (!s.holes.contains(slot))
-			{
-				// Teleport is covered until the dials are worth using: a disabled stand-in
-				g.setColor(new Color(0x2a241b));
-				g.fillRect(slot.x, slot.y, slot.width, slot.height);
-				g.setColor(BRONZE);
-				g.drawRect(slot.x, slot.y, slot.width - 1, slot.height - 1);
-				String t = "Teleport";
-				ink.text(g, t, ink.bold, GREY, slot.x + (slot.width - ink.width(ink.bold, t)) / 2,
-					slot.y + (slot.height - ink.height(ink.bold)) / 2, Ink.Style.SHADOW);
 			}
 		}
 		int by = bar.y + (bar.height - BUTTON_H) / 2;
@@ -841,7 +825,7 @@ public class ChromePainter
 				int x = spot[0];
 				int lo = top;
 				int hi = bottom;
-				for (Rectangle hole : s.holes)
+				for (Rectangle hole : s.blockers())
 				{
 					Rectangle gh = AtlasPainter.grow(hole, 6);
 					if (gh.x < x + w && gh.x + gh.width > x)
@@ -881,7 +865,7 @@ public class ChromePainter
 
 	private static boolean clear(Scene s, Rectangle r, java.awt.Point focus)
 	{
-		for (Rectangle hole : s.holes)
+		for (Rectangle hole : s.blockers())
 		{
 			if (AtlasPainter.grow(hole, 6).intersects(r))
 			{
@@ -892,6 +876,29 @@ public class ChromePainter
 	}
 
 	// ------------------------------------------------------------------ frame and holes
+
+	/** Teleport is covered until the dials are worth using; a disabled stand-in keeps its place. */
+	private void paintTeleportStandIn(Graphics2D g, Scene s)
+	{
+		Rectangle slot = s.teleportSlot;
+		if (slot == null || s.holes.contains(slot))
+		{
+			return;
+		}
+		g.setColor(new Color(0, 0, 0, 90));
+		g.fillRect(slot.x - 2, slot.y + slot.height + 2, slot.width + 5, 3);
+		g.fillRect(slot.x + slot.width + 2, slot.y - 1, 3, slot.height + 3);
+		g.setColor(new Color(0x2a241b));
+		g.fillRect(slot.x, slot.y, slot.width, slot.height);
+		g.setColor(FRAME);
+		g.drawRect(slot.x - 1, slot.y - 1, slot.width + 1, slot.height + 1);
+		g.setColor(BRONZE);
+		g.drawRect(slot.x - 3, slot.y - 3, slot.width + 5, slot.height + 5);
+		String t = "Teleport";
+		ink.text(g, t, ink.bold, GREY, slot.x + (slot.width - ink.width(ink.bold, t)) / 2,
+			slot.y + (slot.height - ink.height(ink.bold)) / 2, Ink.Style.SHADOW);
+		s.hits.add(new Hit(Hit.Kind.BLOCK, AtlasPainter.grow(slot, 3), null, null, null, null));
+	}
 
 	private void paintFrame(Graphics2D g, Scene s)
 	{

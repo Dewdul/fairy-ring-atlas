@@ -261,7 +261,7 @@ public class AtlasPainter
 		placer.addObstacle(s.topBar);
 		placer.addObstacle(s.panel);
 		placer.addObstacle(s.card);
-		for (Rectangle h : s.holes)
+		for (Rectangle h : s.blockers())
 		{
 			placer.addObstacle(grow(h, 4));
 		}
@@ -750,7 +750,7 @@ public class AtlasPainter
 
 	private static boolean inHole(Scene s, int x, int y)
 	{
-		for (Rectangle h : s.holes)
+		for (Rectangle h : s.blockers())
 		{
 			if (h.contains(x, y))
 			{

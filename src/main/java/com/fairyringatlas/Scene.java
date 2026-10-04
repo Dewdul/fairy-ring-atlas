@@ -74,6 +74,18 @@ public final class Scene
 	public Rectangle panel;
 	public Rectangle topBar;
 
+	/** The holes plus Teleport's slot when it is covered: places the card and labels keep clear of. */
+	public List<Rectangle> blockers()
+	{
+		if (teleportSlot == null || holes.contains(teleportSlot))
+		{
+			return holes;
+		}
+		List<Rectangle> out = new ArrayList<>(holes);
+		out.add(teleportSlot);
+		return out;
+	}
+
 	public boolean searching()
 	{
 		return query != null && !query.isEmpty();

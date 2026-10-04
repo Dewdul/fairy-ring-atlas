@@ -1019,22 +1019,26 @@ default font when `FontManager` is unavailable).
 
 ### In-game feedback, 2026-10-03
 
-- **Teleport moves into the top bar.** In the first in-game test, the real Teleport button
-  showed through a hole in the middle of the map reading "Invalid location" (core Fairy
-  Rings rewrites its text, and the dials start at the unused code AIP). Map mode now moves
-  CONFIRM to (299,5) 169x27 inside the dials, and the parchment plaque behind it
-  (ROOT_MODEL25) with it, so Teleport sits at the right end of the top bar beside the close
-  button. Both are put back exactly when leaving map mode. This revises hard rule 4's
-  "never move CONFIRM". Jagex's rules restrict moving click zones only for the inventory,
-  equipment, spellbook, prayer, combat options and 3D components, and moving the real
-  widget is the precedent reviewers accept (Fairy Ring Map's travel log rows,
-  plugin-hub #16240). Its op is untouched.
+- **Teleport and close move to the map's bottom-right corner.** In the first in-game test,
+  the real Teleport button showed through a hole in the middle of the map reading "Invalid
+  location" (core Fairy Rings rewrites its text, and the dials start at the unused code AIP).
+  The close button also sat mid-map. The game draws and clicks 398's components only inside the
+  dials' own 512x334 rectangle, so the map now grows up and left from the dials' bottom-right
+  corner. Map mode moves three components into that corner and puts each back exactly when
+  leaving map mode:
+  - CONFIRM to (335,299) 169x27;
+  - the parchment plaque behind it (ROOT_MODEL25) to (404,297);
+  - the close button (ROOT_GRAPHIC27) to (478,268), just above Teleport.
+
+  The user chose this over a map only 334 px tall, which would have kept close at the top right.
+
+  This revises hard rule 4's "never move CONFIRM or the close button". Jagex's rules restrict
+  moving click zones only for the inventory, equipment, spellbook, prayer, combat options and 3D
+  components. Moving the real widget is the precedent reviewers accept: Fairy Ring Map's
+  travel-log rows, and plugin-hub #16240. The ops are untouched.
 - **Teleport is covered unless worth pressing.** Teleport is a hole only when the dials show
   the selected ring or, with nothing selected, a real destination (`Scene.teleportShown`).
   Otherwise the bar draws a disabled "Teleport" in its place and owns its clicks, so a
   stale or invalid code can't be used by mistake.
-- **Layout.** In resizable mode the map hangs from the dials' top-right corner (left and
-  down), so the close button ends up at the top bar's right corner. The top bar is 36 px
-  tall to hold both buttons.
 - **Open at your ring** (`openAt`, default AROUND_YOU): the map opens centred on the ring
   you are standing at, or on the area you are in.
