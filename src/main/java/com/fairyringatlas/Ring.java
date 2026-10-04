@@ -41,6 +41,8 @@ public class Ring
 	private List<String> notes;
 	private int logVarbit = -1;
 	private boolean noStaffReturn;
+	/** What must hold before a first visit can unlock the ring (UnlockCheck); null when nothing. */
+	private List<Condition> unlock;
 
 	/** Packed widget id of this code's travel log row, from the DB table; -1 until read. */
 	@Setter
@@ -98,6 +100,42 @@ public class Ring
 	public List<String> getNotes()
 	{
 		return nonNull(notes);
+	}
+
+	public List<Condition> getUnlock()
+	{
+		return unlock == null ? Collections.emptyList() : unlock;
+	}
+
+	/**
+	 * One unlock condition from rings.json: a quest state, a varbit or varp comparison, or a need
+	 * the client cannot see ("unknown"). The label reads after "needs".
+	 */
+	@Getter
+	public static class Condition
+	{
+		private String type;
+		private String quest;
+		private String state;
+		private int id;
+		private String op;
+		private int value;
+		private String label;
+
+		public Condition()
+		{
+		}
+
+		Condition(String type, String quest, String state, int id, String op, int value, String label)
+		{
+			this.type = type;
+			this.quest = quest;
+			this.state = state;
+			this.id = id;
+			this.op = op;
+			this.value = value;
+			this.label = label;
+		}
 	}
 
 	/**

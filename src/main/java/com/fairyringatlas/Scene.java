@@ -131,19 +131,34 @@ public final class Scene
 	}
 
 	/**
-	 * The two lines the covered Teleport's stand-in shows: where it would go, and what sets the
-	 * dials. A map click only selects (hard rule 2), so this is how the button answers it.
-	 */
-	/**
 	 * Whether the selected ring must be dialled by hand: it is locked (not in the travel log, so
-	 * there is no row to click) and the dials do not show it yet.
+	 * there is no row to click), the dials do not show it yet, and a first visit could unlock it
+	 * (no unmet unlock condition).
 	 */
 	public boolean needsDialing()
 	{
-		Ring r = repo == null ? null : repo.ring(selected);
-		return r != null && r.isDialable() && !repo.hasLogRow(r.getCode()) && !dialsMatch(r.getCode());
+		UnlockCheck.Result u = lockedSelection();
+		return u != null && u.getStatus() != UnlockCheck.Status.NOT_MET;
 	}
 
+	/** Whether the selected ring is locked and a visit cannot unlock it yet: it needs something first. */
+	public boolean unlockBlocked()
+	{
+		UnlockCheck.Result u = lockedSelection();
+		return u != null && u.getStatus() == UnlockCheck.Status.NOT_MET;
+	}
+
+	/** The selected ring's unlock check while it is locked and not on the dials, else null. */
+	private UnlockCheck.Result lockedSelection()
+	{
+		Ring r = repo == null ? null : repo.ring(selected);
+		return r != null && r.isDialable() && !repo.hasLogRow(r.getCode()) && !dialsMatch(r.getCode()) ? repo.unlock(r) : null;
+	}
+
+	/**
+	 * The two lines the covered Teleport's stand-in shows: where it would go, and what sets the
+	 * dials. A map click only selects (hard rule 2), so this is how the button answers it.
+	 */
 	public String[] teleportStandIn()
 	{
 		Ring r = repo == null ? null : repo.ring(selected);
@@ -160,6 +175,11 @@ public final class Scene
 		{
 			return new String[]{title, rowVisible ? "Click it in the travel log"
 				: searching() ? "Clear the log search first" : "Use it in the travel log first"};
+		}
+		UnlockCheck.Result u = repo.unlock(r);
+		if (u.getStatus() == UnlockCheck.Status.NOT_MET)
+		{
+			return new String[]{r.getCode() + " is locked", "Needs " + u.getLabel()};
 		}
 		return new String[]{title, "Locked: dial it by hand"};
 	}

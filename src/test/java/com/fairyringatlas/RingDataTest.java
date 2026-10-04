@@ -467,4 +467,64 @@ public class RingDataTest
 		// unknown codes are left out
 		assertEquals(Arrays.asList("AIQ", "BKS", "DLS"), codes);
 	}
+
+	@Test
+	public void unlockConditionsNameRealQuestsAndVars() throws Exception
+	{
+		RingRepository repo = real();
+		int rings = 0;
+		for (Ring r : repo.dialable())
+		{
+			if (r.getUnlock().isEmpty())
+			{
+				continue;
+			}
+			rings++;
+			assertFalse(r.getCode() + ": unlock conditions need requirement lines", r.getRequirements().isEmpty());
+			for (Ring.Condition c : r.getUnlock())
+			{
+				String where = r.getCode() + " " + c.getLabel();
+				assertNotNull(where, c.getLabel());
+				assertTrue(where, Arrays.asList("quest", "varbit", "varp", "unknown").contains(c.getType()));
+				if ("quest".equals(c.getType()))
+				{
+					// throws for a name that is not a Quest constant: the plugin would only show a hint
+					net.runelite.api.Quest.valueOf(c.getQuest());
+					assertTrue(where, Arrays.asList("FINISHED", "IN_PROGRESS").contains(c.getState()));
+				}
+				else if (!"unknown".equals(c.getType()))
+				{
+					assertTrue(where, Arrays.asList(">=", ">", "==").contains(c.getOp()));
+				}
+			}
+		}
+		assertTrue("unlock conditions missing from rings.json", rings >= 15);
+		assertEquals(UnlockCheck.Status.UNKNOWN, repo.unlock(repo.ring("DIQ")).getStatus());
+
+		// tools/data/unlock.json names the gameval constant of each id; check they agree
+		File src = new File("tools/data/unlock.json");
+		assertTrue("run from the project directory", src.isFile());
+		Map<?, ?> doc = new Gson().fromJson(new String(java.nio.file.Files.readAllBytes(src.toPath()),
+			java.nio.charset.StandardCharsets.UTF_8), Map.class);
+		int checked = 0;
+		for (Object entry : ((Map<?, ?>) doc.get("rings")).values())
+		{
+			for (Object o : (List<?>) ((Map<?, ?>) entry).get("all"))
+			{
+				Map<?, ?> c = (Map<?, ?>) o;
+				Object name = c.get("name");
+				if (name == null)
+				{
+					continue;
+				}
+				String[] parts = name.toString().split("[.]");
+				Class<?> owner = "VarbitID".equals(parts[0]) ? net.runelite.api.gameval.VarbitID.class
+					: "VarPlayerID".equals(parts[0]) ? net.runelite.api.gameval.VarPlayerID.class : null;
+				assertNotNull(name.toString(), owner);
+				assertEquals(name.toString(), ((Number) c.get("id")).intValue(), owner.getField(parts[1]).getInt(null));
+				checked++;
+			}
+		}
+		assertTrue(checked >= 10);
+	}
 }

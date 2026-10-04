@@ -33,6 +33,8 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.Point;
+import net.runelite.api.Quest;
+import net.runelite.api.QuestState;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
@@ -178,6 +180,8 @@ public class FairyRingAtlasPlugin extends Plugin
 	private long animStart;
 	private volatile List<Hit> hits = Collections.emptyList();
 	private volatile List<Rectangle> holes = Collections.emptyList();
+	/** An unlock check is queued for the client thread (client thread only). */
+	private boolean unlockQueued;
 	private volatile Rectangle panel;
 	@Getter
 	private volatile Rectangle mapButton;
@@ -366,6 +370,7 @@ public class FairyRingAtlasPlugin extends Plugin
 		faveOrder = FavouriteOrder.parse(configManager.getRSProfileConfiguration(FairyRingAtlasConfig.GROUP, KEY_FAVE_ORDER));
 		repo.readDbTable(client);
 		repo.refreshState(client);
+		queueUnlockCheck();
 		search = currentSearch();
 		locatePlayer();
 		notice = fairyRingMapEnabled() ? "Fairy Ring Map is also enabled - disable one of them" : null;
@@ -666,6 +671,72 @@ public class FairyRingAtlasPlugin extends Plugin
 			// once the dials show the selection the filter has done its job
 			applyLogFilter();
 		}
+		if (open && repo.watchesUnlock(id, e.getVarpId()))
+		{
+			queueUnlockCheck();
+		}
+	}
+
+	/**
+	 * Re-checks the locked rings' unlock conditions once, after the current event: the quest
+	 * checks run the client's own quest status script, which must not run inside another script.
+	 * Done when the dials open and when a var a check reads changes, never per frame.
+	 */
+	private void queueUnlockCheck()
+	{
+		if (unlockQueued)
+		{
+			return;
+		}
+		unlockQueued = true;
+		clientThread.invokeLater(() ->
+		{
+			unlockQueued = false;
+			if (open && client.getGameState() == GameState.LOGGED_IN)
+			{
+				repo.checkUnlocks(clientVars());
+			}
+		});
+	}
+
+	/** The client's vars for one unlock check; each quest is asked once. */
+	private UnlockCheck.Vars clientVars()
+	{
+		Map<String, QuestState> quests = new HashMap<>();
+		return new UnlockCheck.Vars()
+		{
+			@Override
+			public int varbit(int id)
+			{
+				return client.getVarbitValue(id);
+			}
+
+			@Override
+			public int varp(int id)
+			{
+				return client.getVarpValue(id);
+			}
+
+			@Override
+			public QuestState quest(String name)
+			{
+				if (!quests.containsKey(name))
+				{
+					QuestState state = null;
+					try
+					{
+						state = Quest.valueOf(name).getState(client);
+					}
+					catch (RuntimeException ex)
+					{
+						// an unknown quest name (a newer rings.json) only makes the check a hint
+						log.debug("quest {} unreadable", name, ex);
+					}
+					quests.put(name, state);
+				}
+				return quests.get(name);
+			}
+		};
 	}
 
 	@Subscribe

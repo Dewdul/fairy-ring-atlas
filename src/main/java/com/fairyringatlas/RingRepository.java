@@ -102,9 +102,14 @@ public class RingRepository
 		HOUSE_TOWNS.put(value, town);
 		HOUSE_PORTALS.put(value, new int[]{x, y});
 	}
-	/** Changes whenever visited, favourites or the last destination change; for cache keys. */
+	/** Changes whenever visited, favourites, the last destination or an unlock check change; for cache keys. */
 	@Getter
 	private int stateHash;
+	/** Unlock check per code (rings with conditions only), read while the dials are open. */
+	private Map<String, UnlockCheck.Result> unlocks = Collections.emptyMap();
+	/** The varbits and varps those checks read, so a change to one re-runs them. */
+	private Set<Integer> unlockVarbits = Collections.emptySet();
+	private Set<Integer> unlockVarps = Collections.emptySet();
 
 	private static final class RingsFile
 	{
@@ -393,7 +398,7 @@ public class RingRepository
 			? DialMath.fromIndex(client.getVarbitValue(VarbitID.FAIRYRING_LASTLOC)) : null;
 		staffless = client.getVarbitValue(VarbitID.LUMBRIDGE_DIARY_ELITE_COMPLETE) == 1;
 		placeHouse(client.getVarbitValue(VarbitID.POH_HOUSE_LOCATION));
-		stateHash = java.util.Objects.hash(visited, favourites, lastCode, houseValue);
+		rehash();
 	}
 
 	/**
@@ -480,7 +485,59 @@ public class RingRepository
 		favourites.clear();
 		favourites.putAll(faves);
 		lastCode = last;
-		stateHash = java.util.Objects.hash(visited, favourites, lastCode);
+		rehash();
+	}
+
+	private void rehash()
+	{
+		stateHash = java.util.Objects.hash(visited, favourites, lastCode, houseValue, unlocks);
+	}
+
+	/**
+	 * Whether a first visit can unlock the ring: MET for a ring with no conditions, a hint
+	 * (UNKNOWN) until {@link #checkUnlocks} has read the vars.
+	 */
+	public UnlockCheck.Result unlock(Ring r)
+	{
+		UnlockCheck.Result u = r == null ? null : unlocks.get(r.getCode());
+		return u != null ? u : r == null ? UnlockCheck.MET : UnlockCheck.unchecked(r.getUnlock());
+	}
+
+	/** Client thread (the client-backed vars run the quest status script): re-checks every ring's unlock conditions. */
+	public void checkUnlocks(UnlockCheck.Vars vars)
+	{
+		Map<String, UnlockCheck.Result> out = new HashMap<>();
+		Set<Integer> varbits = new HashSet<>();
+		Set<Integer> varps = new HashSet<>();
+		for (Ring r : byCode.values())
+		{
+			if (r.getUnlock().isEmpty())
+			{
+				continue;
+			}
+			out.put(r.getCode(), UnlockCheck.evaluate(r.getUnlock(), vars));
+			for (Ring.Condition c : r.getUnlock())
+			{
+				if ("varbit".equals(c.getType()))
+				{
+					varbits.add(c.getId());
+				}
+				else if ("varp".equals(c.getType()))
+				{
+					varps.add(c.getId());
+				}
+			}
+		}
+		unlocks = out;
+		unlockVarbits = varbits;
+		unlockVarps = varps;
+		rehash();
+	}
+
+	/** Whether a VarbitChanged for this varbit (-1 for a whole varp) and varp touches an unlock check. */
+	public boolean watchesUnlock(int varbitId, int varpId)
+	{
+		return unlockVarbits.contains(varbitId) || unlockVarps.contains(varpId);
 	}
 
 	/** Dialable rings in code order. */

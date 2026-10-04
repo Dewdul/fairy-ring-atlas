@@ -10,8 +10,9 @@ ring list the plugin bundles (DESIGN.md section 3.1). None of it ships in the ja
 | `fairy_rings.verified.json` | The research dataset and source of truth for codes, landing tiles, the game's `no_staff_return` flag and the `FAIRYRINGS_LOG_*` varbit ids. A byte-identical copy of the research track's verified file (sha256 `9ee09794b468823e57b51596a67689604fa03e7b66b321d0be84b8fc33ecaf43`). |
 | `ring_display.json` | The player-facing text, one entry per ring: short name, area, one-line description, requirement lines, danger lines, points of interest, search tags and notes. Each entry lists the wiki pages it was checked against under `sources`. This text replaces the dataset's own `name`, `description`, `poi` and `notes` fields, which were written as research notes. |
 | `portals.json` | Surface entrances of underground layers, each with its wiki source, plus the reasons other layers have none. |
+| `unlock.json` | What must hold before a first visit can unlock a ring: the quest states, varbits and varps the plugin reads for the card's "Locked - needs ...". Each condition has a source, a confidence and, where it is an inference, the reasoning. Copied into `rings.json` as `unlock`, without the source text. |
 
-`tools/build_rings.py` combines the three into `rings.json`.
+`tools/build_rings.py` combines the four into `rings.json`.
 
 ## Regenerating
 
@@ -62,6 +63,14 @@ The build fails with a message for each of these:
   at most 120 characters. List items are at most 140 characters. All text is printable
   ASCII, because the info card uses RuneScape bitmap fonts. Tags are lowercase. Lists have
   no duplicates, and there are at most 12 POIs.
+- **Unlock conditions.** Each `unlock.json` code is a dialable ring with requirement lines.
+  A condition is `quest` (a `Quest` constant name and `FINISHED` or `IN_PROGRESS`), `varbit`
+  or `varp` (an id, `>=`, `>` or `==`, an integer, and the gameval constant's `name`), or
+  `unknown` (a need the client cannot read). Labels are at most 32 characters, so "Locked -
+  needs <label>" fits on one line of the compact card. Every condition has a source and a
+  confidence, and a `low` one must be `unknown`, so a guess is only ever a hint. A ring cannot
+  have only `unknown` conditions. `RingDataTest` also checks every quest name against
+  `net.runelite.api.Quest` and every `name` against its gameval id.
 - **Portals.** Each portal is on an underground layer that has rings, inside the surface
   crop (x 1152-3776, y 2368-4032), with at most one per layer and a source.
 - **Map index.** When `src/main/resources/com/fairyringatlas/map/index.json` exists (written

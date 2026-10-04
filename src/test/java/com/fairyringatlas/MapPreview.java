@@ -42,7 +42,7 @@ public class MapPreview
 		Set<String> visited = new HashSet<>();
 		for (Ring r : repo.dialable())
 		{
-			if (!Arrays.asList("BLQ", "CJQ", "AIS", "DLP", "CKQ", "AJP", "BJP").contains(r.getCode()))
+			if (!Arrays.asList("BLQ", "CJQ", "AIS", "DLP", "CKQ", "AJP", "BJP", "AKP", "CLR").contains(r.getCode()))
 			{
 				visited.add(r.getCode());
 			}
@@ -54,6 +54,14 @@ public class MapPreview
 		faves.put("BKS", 3);
 		faves.put("DLS", 4);
 		repo.setState(visited, faves, "DKR");
+		// unlock checks: Children of the Sun under way (AIS, AJP, CKQ need it), Beneath Cursed Sands
+		// short of the Necropolis (AKP), the Great Conch reached (CJQ: a visit unlocks it), Monkey
+		// Madness I done (CLR: Daero's training cannot be checked)
+		repo.checkUnlocks(new UnlockCheckTest.FakeVars()
+			.quest("CHILDREN_OF_THE_SUN", net.runelite.api.QuestState.IN_PROGRESS)
+			.quest("MONKEY_MADNESS_I", net.runelite.api.QuestState.FINISHED)
+			.varbit(net.runelite.api.gameval.VarbitID.BCS, 5)
+			.varbit(net.runelite.api.gameval.VarbitID.TT, 12));
 
 		AtlasPainter painter = new AtlasPainter();
 		Layer surface = repo.surface();
@@ -78,6 +86,14 @@ public class MapPreview
 		Rectangle free = new Rectangle(30, 30, 1738, 905);
 		render(repo, painter, out, "8-free-space", FairyRingAtlasPlugin.fitRings(MapView.of(surface, free), repo.ringsIn(Layer.SURFACE), 0, wide),
 			"CKS", "AIQ", new int[]{0, 1, 2}, false);
+		// a locked ring: needs something first, a first visit unlocks it, a need that cannot be checked
+		String[][] locked = {{"9-locked-needs", "AKP"}, {"10-locked-visit", "CJQ"}, {"11-locked-hint", "CLR"}};
+		for (String[] l : locked)
+		{
+			Ring r = repo.ring(l[1]);
+			render(repo, painter, out, l[0], MapView.of(surface, big).focusOn(r.getX() + 0.5, r.getY() + 0.5, 2, wide),
+				l[1], null, new int[]{0, 1, 2}, false);
+		}
 		ringChecks(repo, painter, out);
 		icons(repo, painter, out);
 	}
@@ -303,6 +319,7 @@ public class MapPreview
 
 	static List<String> names()
 	{
-		return Arrays.asList("1-fit", "2-lumbridge-4ppt", "3-16ppt", "4-zanaris", "5-fixed-fit", "6-kandarin-1ppt", "7-checks");
+		return Arrays.asList("1-fit", "2-lumbridge-4ppt", "3-16ppt", "4-zanaris", "5-fixed-fit", "6-kandarin-1ppt", "7-checks",
+			"9-locked-needs", "10-locked-visit", "11-locked-hint");
 	}
 }

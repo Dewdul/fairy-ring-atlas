@@ -222,7 +222,11 @@ research dataset.
       "tags": ["mogre", "..."],            // extra search terms (RuneLite enum tags etc.)
       "notes": ["..."],
       "logVarbit": 3990,                   // FAIRYRINGS_LOG_<CODE>; -1 if none
-      "noStaffReturn": false
+      "noStaffReturn": false,
+      "unlock": [                          // optional: what must hold before a first visit unlocks it
+        {"type": "quest", "quest": "REGICIDE", "state": "FINISHED", "label": "Regicide"},
+        {"type": "varbit", "id": 13841, "op": ">=", "value": 14, "label": "Beneath Cursed Sands progress"}
+      ]
     }
   ],
   "global": {
@@ -232,6 +236,14 @@ research dataset.
 }
 ```
 
+- **Unlock** is optional, from `tools/data/unlock.json`. Each condition is a
+  quest (a `net.runelite.api.Quest` constant name and the `QuestState` it must
+  reach, `FINISHED` or `IN_PROGRESS`), a `varbit` or `varp` compared with
+  `>=`, `>` or `==`, or `unknown`: a need the client cannot read, shown as a
+  hint and never treated as met or failed. All must hold. Labels are at most
+  32 characters and read after "needs". A low-confidence condition must be
+  `unknown`, so a guess can never lock a ring away (see "Unlock requirements"
+  under Deviations).
 - **Portals** are optional. They are surface positions where an underground
   layer is entered, and are only listed where a clear single entrance exists.
 - **Other entries:** the AIR→DLR→DJQ→AJS hideout sequence (`kind: sequence`)
@@ -513,8 +525,25 @@ marker) does the following:
   "Use it in the travel log first", "Clear the log search first" or "Locked:
   dial it by hand". With nothing selected it reads "Teleport" / "Pick a ring
   on the map". The map click itself never sets the dials (hard rule 2).
-- **Else** (not visited): the next-step line reads "Not in your travel log
-  yet — dial it: A ↻1 · I ✓ · Q ↺1", followed by a **[Show dials]** button.
+- **Else** (not visited), by the ring's unlock check (`UnlockCheck`, 4.9):
+  - **NOT_MET** (a condition does not hold): the card's status reads "Locked -
+    needs <label>" in red (`BLOCKED`), and the step line "Not unlocked yet:
+    needs <label> first." There is no dial row and no orange button
+    (`Scene.needsDialing()` is false, `unlockBlocked()` true); the grey
+    stand-in reads "CODE is locked" / "Needs <label>" (wrapped to two lines).
+  - **MET** (no conditions, or all hold): status "Locked - a first visit
+    unlocks it"; step "A first visit unlocks it: dial it by hand (orange
+    button), then Teleport:", the dial plan and **[Show dials]**; Teleport's
+    slot is the orange "Dial CODE by hand" button.
+  - **UNKNOWN** (all readable conditions hold but an `unknown` one remains, or
+    the vars are not read yet): status "Locked - needs <label>" in amber, step
+    "If you have <label>, a first visit unlocks it: ...", and the dial offer
+    stays. The house ring keeps its own wording: "Not used yet - needs a fairy
+    ring in your house" and "Build a fairy ring in your house's garden first;
+    then dial DIQ by hand:".
+
+  The status line is one line on the compact card (it is fitted) and wraps on
+  the full card. Markers keep the plain padlock for every locked ring.
 
 **After "Use code" or a manual rotation:**
 - `VarbitChanged` on 3985-3987 updates the dial readout.
@@ -697,6 +726,20 @@ On the first open of 398, on the client thread:
   dial values) and from the `FAVE_CODE_n` texts as a fallback.
 - The last destination comes from 5374/20250.
 
+**Unlock checks** (`UnlockCheck`, pure; the plugin supplies `UnlockCheck.Vars`).
+They run once each time 398 opens, and again when `VarbitChanged` touches a
+varbit or varp a condition reads (`RingRepository.watchesUnlock`), never per
+frame. A run is queued with `clientThread.invokeLater` (one at a time) and
+skipped unless `LOGGED_IN`. Quests are read with RuneLite's
+`Quest.getState(client)`, once per quest per run. That runs the client's own
+quest status script (4029), a local read that sends nothing; our code never
+calls `runScript` itself (hard rule 1). A name that is not a `Quest` constant
+reads as unknown. The first unmet condition gives NOT_MET and its label;
+otherwise the first `unknown` one gives UNKNOWN; otherwise MET. Until the first
+run, a ring with conditions is UNKNOWN with its first label, which still offers
+the dials. Results are part of `stateHash`, so the chrome layer redraws when
+they change.
+
 **Search matching.** Case-insensitive substring on the code (with or without
 spaces), name, area, POIs, tags and description words. When the code row also
 carries user tags from the core plugin, ignore that: we can only match our own
@@ -767,6 +810,7 @@ plugin is enabled, the two would fight.
 | `DialGuideOverlay` | May live inside `AtlasOverlay`; Dial-mode guidance |
 | `ClueHelper` | Optional `ClueScrollService` integration, defensive |
 | `LabelPlacer` | Greedy collision-avoiding label placement. Pure; unit tested |
+| `UnlockCheck` | A locked ring's unlock conditions against quest states and vars (MET / UNKNOWN / NOT_MET). Pure; unit tested |
 
 **Tests** in `src/test/java/com/fairyringatlas/`:
 - `DialMathTest`
@@ -776,7 +820,12 @@ plugin is enabled, the two would fight.
   move and restore paths against a fake toplevel.
 - `RingDataTest`: loads the real `rings.json` and `index.json` and checks that
   every ring lies in its layer's bounds, that codes are unique, and that every
-  index tile exists as a resource.
+  index tile exists as a resource. It also checks that every unlock quest is a
+  `Quest` constant and that each id in `tools/data/unlock.json` equals the
+  gameval constant it names.
+- `UnlockCheckTest`: the evaluator against fake vars and quest states, the
+  repository's checks and watched vars, and the stand-in and dial offer for a
+  ring that needs something first.
 - `ComplianceTest`
 - `FairyRingAtlasPluginTest`: the dev launcher main.
 
@@ -1218,3 +1267,48 @@ already ran the plugin. Base-map memory at the full size stays inside the `TileS
   closes and reopens within about 2 ticks);
 - with Fixed Resizable Hybrid and with Better Resizable Chat;
 - opening the bank and the GE right after the dials: they must open centred.
+
+### Unlock requirements (added 2026-10-04, at the user's request)
+
+The card said "Locked: dial it by hand" for every locked ring, even AKP for a
+player who could not unlock it yet. Now a locked ring names what it still needs
+(4.5), read from the player's own quest progress (4.9), and only offers the
+dials once a first visit can unlock it.
+
+**Data.** `tools/data/unlock.json` is merged into `rings.json` as `unlock` by
+`build_rings.py`. The script checks: known dialable codes only, the types, ops
+and quest states, labels of at most 32 characters, a source per condition, low
+confidence only as `unknown`, and requirement lines on the ring. 18 rings, 23
+conditions:
+
+| Ring | Condition | Confidence |
+|---|---|---|
+| AIS, AJP, CKQ | Children of the Sun finished; `VARLAMORE_VISITED` (9650) >= 1 | high; medium |
+| AJQ | Death to the Dorgeshuun finished | high |
+| AKP | `BCS` (13841) >= 14 | medium |
+| AKR, CIR, CIS, DJR | `ZEAH_PLAYERHASVISITED` (4897) == 1 | medium |
+| BJR | varp `GRAIL` (5) >= 9 | medium |
+| BJS | Regicide finished | high |
+| BLQ | `LOTG` (13599) >= 50 | medium |
+| CIP | The Fremennik Trials finished | high |
+| CJQ | `TT` (18321) >= 12 | medium |
+| CLR | Monkey Madness I finished; Daero's training (`unknown`) | high; low |
+| DIQ | Fairytale II finished; a fairy ring built in the house (`unknown`) | high; low |
+| DLP | `GRIMSTONE_VISITED` (19564) >= 1 | medium |
+| DLS | In Search of the Myreque finished | high |
+
+Sources: the OSRS Wiki (`Fairy_ring` and the quest pages), Skretzo's
+shortest-path `fairy_rings.tsv`, Quest Helper's quest step tables and
+`QuestVarbits`, and the game's cs2 scripts (charters, teleport requirements).
+Every id was checked against the 1.13.1 gamevals with `javap`, and every quest
+name against `net.runelite.api.Quest`. Agility and greegree gates (AKP 62, BJS
+76, CLR 48) limit using a ring, not unlocking it, so they stay requirement
+lines only. BLS has no condition: the wiki gives it no Kourend gate. The global
+Fairytale II gate is not checked, because the dials cannot be open without it.
+
+**Least certain** (check in game): the AKP threshold (12 or 14 on arriving in
+the Necropolis), BJR (8 or 9), BLQ (partial at 50, per shortest-path, against
+the quest page's completion reward), `GRIMSTONE_VISITED` meaning a first
+mooring, and `VARLAMORE_VISITED` / `ZEAH_PLAYERHASVISITED` being the rings' own
+gates. A wrong threshold only shows "needs ..." for one stage too many or too
+few; the Dials button in the top bar opens the dials either way.

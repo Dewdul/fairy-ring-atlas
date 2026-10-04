@@ -48,6 +48,8 @@ public class ChromePainter
 	static final Color DANGER = new Color(0xFF5A4E);
 	static final Color GOOD = new Color(0x6BE36B);
 	static final Color HINT = new Color(0xFFE36B);
+	/** A locked ring a visit cannot unlock yet: it needs something first. */
+	static final Color BLOCKED = new Color(0xFF7A5C);
 
 	private final Ink ink;
 
@@ -712,12 +714,13 @@ public class ChromePainter
 		{
 			lines.add(new Line(ink.fit(title, ink.bold, textW), ink.bold, TITLE, 0));
 		}
+		UnlockCheck.Result unlock = s.repo.unlock(ring);
+		boolean blocked = !visited && unlock.getStatus() == UnlockCheck.Status.NOT_MET;
 		if (ring.isDialable())
 		{
 			boolean house = "DIQ".equals(ring.getCode());
 			StringBuilder status = new StringBuilder(visited ? (full ? "Unlocked - in your travel log" : "Unlocked")
-				: house ? "Not used yet - needs a fairy ring in your house"
-				: (full ? "Locked - not in your travel log yet" : "Locked - not in your travel log"));
+				: house ? "Not used yet" : "Locked");
 			if (s.repo.isFavourite(ring.getCode()))
 			{
 				status.append(" - favourite");
@@ -730,7 +733,21 @@ public class ChromePainter
 			{
 				status.append(" - you are here");
 			}
-			lines.add(new Line(ink.fit(status.toString(), ink.small, textW), ink.small, visited ? s.visitedColor : AMBER, full ? 2 : 0));
+			if (!visited)
+			{
+				// what unlocking it takes: the first unmet need, a need the client cannot check, or
+				// nothing more than a first visit
+				status.append(unlock.getLabel() != null ? " - needs " + unlock.getLabel() : " - a first visit unlocks it");
+			}
+			Color statusColor = visited ? s.visitedColor : blocked ? BLOCKED : AMBER;
+			if (full)
+			{
+				addWrapped(lines, status.toString(), ink.small, statusColor, textW, 2);
+			}
+			else
+			{
+				lines.add(new Line(ink.fit(status.toString(), ink.small, textW), ink.small, statusColor, 0));
+			}
 			// the game's own one-click teleports from any ring, without opening the dials
 			String oneClick = s.repo.isFavourite(ring.getCode()) ? "Favourites > " + ring.getCode()
 				: ring.getCode().equals(s.repo.getLastCode()) ? "Last-destination (" + ring.getCode() + ")" : null;
@@ -819,11 +836,17 @@ public class ChromePainter
 					: s.searching() ? "Clear the travel log search to show this code."
 					: "Use this code in your travel log, then Teleport.", ink.small, HINT, 6);
 			}
+			else if (blocked)
+			{
+				// a visit cannot unlock it yet, so there is nothing to dial
+				step = new Line("Not unlocked yet: needs " + unlock.getLabel() + " first.", ink.small, BLOCKED, 6);
+			}
 			else
 			{
 				// the house's ring is only there once built in the garden; otherwise the code goes nowhere
 				step = new Line("DIQ".equals(code) ? "Build a fairy ring in your house's garden first; then dial DIQ by hand:"
-					: "Locked: dial it by hand (orange button), then Teleport:", ink.small, HINT, 6);
+					: unlock.getLabel() != null ? "If you have " + unlock.getLabel() + ", a first visit unlocks it: dial it by hand (orange button), then Teleport:"
+					: "A first visit unlocks it: dial it by hand (orange button), then Teleport:", ink.small, HINT, 6);
 				dialRow = s.dials != null;
 			}
 		}
@@ -1088,11 +1111,21 @@ public class ChromePainter
 		// it says where it would go and what sets the dials, so selecting a ring visibly changes it
 		String[] t = s.teleportStandIn();
 		String title = ink.fit(t[0], ink.bold, slot.width - 8);
-		String why = ink.fit(t[1], ink.small, slot.width - 8);
-		int y = slot.y + (slot.height - ink.height(ink.bold) - ink.height(ink.small)) / 2;
+		// a locked ring's need may take two lines
+		List<String> why = ink.wrap(t[1], ink.small, slot.width - 8);
+		if (why.size() > 2)
+		{
+			why = java.util.Arrays.asList(why.get(0), ink.fit(why.get(1) + " " + why.get(2), ink.small, slot.width - 8));
+		}
+		Color whyColor = s.selected == null ? GREY : s.unlockBlocked() ? BLOCKED : HINT;
+		int y = slot.y + (slot.height - ink.height(ink.bold) - ink.height(ink.small) * why.size()) / 2;
 		ink.text(g, title, ink.bold, GREY, slot.x + (slot.width - ink.width(ink.bold, title)) / 2, y, Ink.Style.SHADOW);
-		ink.text(g, why, ink.small, s.selected == null ? GREY : HINT, slot.x + (slot.width - ink.width(ink.small, why)) / 2,
-			y + ink.height(ink.bold), Ink.Style.SHADOW);
+		y += ink.height(ink.bold);
+		for (String w : why)
+		{
+			ink.text(g, w, ink.small, whyColor, slot.x + (slot.width - ink.width(ink.small, w)) / 2, y, Ink.Style.SHADOW);
+			y += ink.height(ink.small);
+		}
 		s.hits.add(new Hit(Hit.Kind.BLOCK, AtlasPainter.grow(slot, 3), null, null, null, null));
 	}
 

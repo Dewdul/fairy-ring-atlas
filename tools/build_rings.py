@@ -6,6 +6,8 @@ Inputs (all under tools/data/):
   ring_display.json          curated player-facing text: names, areas, descriptions,
                              requirement lines, dangers, POIs, search tags, notes
   portals.json               surface entrances of underground layers
+  unlock.json                what must hold before a first visit can unlock a ring
+                             (quest states and vars the plugin reads; optional per ring)
 
 The output is deterministic: same inputs, same bytes. The script fails loudly (exit 1)
 on any contract violation. Standard library only; Python 3.8+.
@@ -31,6 +33,7 @@ DATA = os.path.join(TOOLS, 'data')
 DATASET = os.path.join(DATA, 'fairy_rings.verified.json')
 DISPLAY = os.path.join(DATA, 'ring_display.json')
 PORTALS = os.path.join(DATA, 'portals.json')
+UNLOCK = os.path.join(DATA, 'unlock.json')
 OUT = os.path.join(ROOT, 'src', 'main', 'resources', 'com', 'fairyringatlas', 'rings.json')
 INDEX = os.path.join(ROOT, 'src', 'main', 'resources', 'com', 'fairyringatlas', 'map', 'index.json')
 
@@ -93,8 +96,17 @@ KEY_GROUPS = [
     ('tags',),
     ('notes',),
     ('logVarbit', 'noStaffReturn'),
+    ('unlock',),
     ('sequence',),
 ]
+
+# unlock.json: condition types, comparisons and quest states the plugin understands (UnlockCheck)
+UNLOCK_TYPES = ('quest', 'varbit', 'varp', 'unknown')
+UNLOCK_OPS = ('>=', '>', '==')
+UNLOCK_STATES = ('FINISHED', 'IN_PROGRESS')
+UNLOCK_CONFIDENCE = ('high', 'medium', 'low')
+UNLOCK_LABEL_MAX = 32           # 'Locked - needs <label>' stays one line on the compact card
+QUEST_RE = re.compile(r'^[A-Z][A-Z0-9_]*$')
 
 
 class BuildError(Exception):
@@ -143,9 +155,65 @@ def check_list(errors, where, values, limit=LINE_MAX):
         errors.append('%s: duplicate entries' % where)
 
 
-def build(dataset, display, portals_doc):
+def unlock_conditions(errors, code, entry, ring):
+    """Validates one unlock.json entry; returns its conditions as rings.json carries them."""
+    where = '%s.unlock' % code
+    conds = entry.get('all') if isinstance(entry, dict) else None
+    if not isinstance(conds, list) or not conds:
+        errors.append('%s: needs a non-empty "all" list' % where)
+        return []
+    if set(entry) - {'all'}:
+        errors.append('%s: unknown keys %s' % (where, sorted(set(entry) - {'all'})))
+    if not ring['requirements']:
+        errors.append('%s: the ring has no requirement lines to explain it' % where)
+    out = []
+    for i, c in enumerate(conds):
+        w = '%s[%d]' % (where, i)
+        t = c.get('type')
+        if t not in UNLOCK_TYPES:
+            errors.append('%s: type %r not in %s' % (w, t, UNLOCK_TYPES))
+            continue
+        check_text(errors, w + '.label', c.get('label'), UNLOCK_LABEL_MAX)
+        conf = c.get('confidence')
+        if conf not in UNLOCK_CONFIDENCE:
+            errors.append('%s: confidence %r not in %s' % (w, conf, UNLOCK_CONFIDENCE))
+        # a guess must never lock a ring away: a low-confidence condition is only ever a hint
+        if conf == 'low' and t != 'unknown':
+            errors.append('%s: a low-confidence condition must be type "unknown"' % w)
+        if not c.get('source'):
+            errors.append('%s: no source' % w)
+        o = {'type': t}
+        if t == 'quest':
+            if not QUEST_RE.match(str(c.get('quest', ''))):
+                errors.append('%s: quest %r is not a Quest constant name' % (w, c.get('quest')))
+            if c.get('state') not in UNLOCK_STATES:
+                errors.append('%s: state %r not in %s' % (w, c.get('state'), UNLOCK_STATES))
+            o['quest'] = c.get('quest')
+            o['state'] = c.get('state')
+        elif t in ('varbit', 'varp'):
+            if not isinstance(c.get('id'), int) or c['id'] < 0:
+                errors.append('%s: bad id %r' % (w, c.get('id')))
+            if c.get('op') not in UNLOCK_OPS:
+                errors.append('%s: op %r not in %s' % (w, c.get('op'), UNLOCK_OPS))
+            if not isinstance(c.get('value'), int):
+                errors.append('%s: bad value %r' % (w, c.get('value')))
+            prefix = 'VarbitID.' if t == 'varbit' else 'VarPlayerID.'
+            if not str(c.get('name', '')).startswith(prefix):
+                errors.append('%s: name %r must be the %s constant' % (w, c.get('name'), prefix))
+            o['id'] = c.get('id')
+            o['op'] = c.get('op')
+            o['value'] = c.get('value')
+        o['label'] = c.get('label')
+        out.append(o)
+    if out and all(o['type'] == 'unknown' for o in out):
+        errors.append('%s: only unknown conditions; say it in notes instead' % where)
+    return out
+
+
+def build(dataset, display, portals_doc, unlock_doc=None):
     errors, warnings = [], []
     shown = display['rings']
+    unlocks = (unlock_doc or {}).get('rings', {})
 
     # ---- the dataset itself ---------------------------------------------------------
     ids = [entry_id(e) for e in dataset]
@@ -180,6 +248,9 @@ def build(dataset, display, portals_doc):
         errors.append('ring_display.json lacks: %s' % missing)
     if extra:
         errors.append('ring_display.json has unknown ids: %s' % extra)
+    stray = sorted(set(unlocks) - set(codes))
+    if stray:
+        errors.append('unlock.json names codes that are not dialable rings: %s' % stray)
     if errors:
         raise BuildError('\n'.join(errors))
 
@@ -235,6 +306,8 @@ def build(dataset, display, portals_doc):
             'logVarbit': log_varbit,
             'noStaffReturn': bool(game.get('noStaffReturn', False)),
         }
+        if kind == 'destination' and rid in unlocks:
+            ring['unlock'] = unlock_conditions(errors, rid, unlocks[rid], ring)
         if kind == 'sequence':
             seq = e['code'].split('-')
             ring['sequence'] = seq
@@ -464,6 +537,9 @@ def summary(doc, warnings):
         'with per-ring requirements: %d; with danger: %d; noStaffReturn: %d' % (
             sum(bool(r['requirements']) for r in rings), sum(bool(r['danger']) for r in rings),
             sum(r['noStaffReturn'] for r in rings)),
+        'with unlock conditions: %d (%d conditions, %d unknown)' % (
+            sum('unlock' in r for r in rings), sum(len(r.get('unlock', [])) for r in rings),
+            sum(c['type'] == 'unknown' for r in rings for c in r.get('unlock', []))),
         'POIs per dialable ring: min %d, max %d, total %d; tags total %d' % (
             min(poi), max(poi), sum(poi), sum(len(r['tags']) for r in rings)),
         'portals: ' + ', '.join('%s (%d,%d)' % (p['layer'], p['x'], p['y']) for p in doc['portals']),
@@ -481,7 +557,7 @@ def main(argv=None):
     ap.add_argument('--varbits', help='RuneLite gameval VarbitID source to cross-check log varbits')
     args = ap.parse_args(argv)
     try:
-        doc, warnings = build(load(DATASET), load(DISPLAY), load(PORTALS))
+        doc, warnings = build(load(DATASET), load(DISPLAY), load(PORTALS), load(UNLOCK))
         text = dump(doc)
         extra = []
         if os.path.exists(INDEX):
