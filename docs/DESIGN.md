@@ -1042,3 +1042,8 @@ default font when `FontManager` is unavailable).
   stale or invalid code can't be used by mistake.
 - **Open at your ring** (`openAt`, default AROUND_YOU): the map opens centred on the ring
   you are standing at, or on the area you are in.
+- **No mouse-over text over the map.** While the map shows, the game's top-left mouse-over
+  text ("Select CKP ...", "Cancel") is turned off with `client.setMouseoverTextEnabled(false)`,
+  because it overlapped the map's title and the map has its own hover card. It is turned back
+  on (only if we turned it off) when the map closes, in Dial mode, on logout and on shutdown.
+  This is display-only and sends nothing to the game.

@@ -201,6 +201,11 @@ public class FairyRingAtlasPlugin extends Plugin
 	private final Set<Integer> hiddenByUs = new HashSet<>();
 	/** Original x, y, width and height of the components we moved, by component id. */
 	private final Map<Integer, int[]> movedByUs = new HashMap<>();
+	/**
+	 * Whether we turned off the game's mouse-over text (top-left of the screen) for the map, which
+	 * shows its own hover card; it is turned back on as soon as the map is not showing.
+	 */
+	private boolean mouseoverHiddenByUs;
 	/** The code the player picked in the travel log itself; the log is not filtered for it. */
 	private String logPicked;
 	/** Whether the decoded tiles and map-sized caches were released since the interface closed. */
@@ -430,6 +435,7 @@ public class FairyRingAtlasPlugin extends Plugin
 			}
 			hiddenByUs.clear();
 			movedByUs.clear();
+			restoreMouseoverText();
 			travelLog.forget();
 			hits = Collections.emptyList();
 		}
@@ -639,6 +645,21 @@ public class FairyRingAtlasPlugin extends Plugin
 			movedByUs.putIfAbsent(m[0], new int[]{w.getOriginalX(), w.getOriginalY(), w.getOriginalWidth(), w.getOriginalHeight()});
 			place(w, m[1], m[2], m[3], m[4]);
 		}
+		if (client.isMouseoverTextEnabled())
+		{
+			client.setMouseoverTextEnabled(false);
+			mouseoverHiddenByUs = true;
+		}
+	}
+
+	/** Turn the game's mouse-over text back on, if we turned it off. */
+	private void restoreMouseoverText()
+	{
+		if (mouseoverHiddenByUs)
+		{
+			client.setMouseoverTextEnabled(true);
+			mouseoverHiddenByUs = false;
+		}
 	}
 
 	/** Un-hide only what we hid, and only if it is still hidden; put back what we moved. */
@@ -663,6 +684,7 @@ public class FairyRingAtlasPlugin extends Plugin
 			}
 		}
 		movedByUs.clear();
+		restoreMouseoverText();
 	}
 
 	private static void place(Widget w, int x, int y, int width, int height)
