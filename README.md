@@ -8,7 +8,7 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 - **Names in the ring's own menu.** Right-click a fairy ring and *Last-destination (AJR)* reads *Last (AJR) Fremennik Slayer Dungeon*, and the *Favourites* codes show the destination's name, e.g. *CIR Mount Karuulm*. Entries Fairy Ring Favourites has already renamed are left alone.
 - **Your house.** DIQ is drawn at your house portal (Rimmington, Taverley, Pollnivneach, Rellekka, Brimhaven, Yanille, Hosidius or Aldarin), and the *Your house* card zooms to it. It shows as locked until you have used a fairy ring in your house.
 - **Favourites list.** Your in-game favourites (starred in the travel log) are listed at the top of the side panel. Click one to select it and zoom to it. Its card also reminds you of the game's own one-click teleport: right-click any fairy ring, then *Favourites*. Your last destination gets the same tip for *Last-destination*. Drag a favourite to put the list in your own order (saved per account; the game's own favourites are not changed).
-- **Groups panel.** A second panel on the right of the map holds quick-click groups of rings. It comes with a *Slayer* group (task masters and slayer areas) and a *Farming* group (herb, tree, hops and other patches), each in a suggested run order. It is closed by default: click the *Groups* tab on the map's right edge to open it. Click a ring in a group to select it and zoom to it; hover it to see why it is in the group. You can make your own groups and change the prebuilt ones (see below). Groups are saved on this computer for all your accounts.
+- **Groups panel.** A second panel on the right of the map holds quick-click groups of rings. It comes with a *Slayer* group (task masters and slayer areas) and a *Farming* group (herb, tree, hops and other patches), each in a suggested order (Farming in run order). It is closed by default: click the *Groups* tab on the map's right edge to open it. Click a ring in a group to select it and zoom to it; hover it to see why it is in the group. You can make your own groups and change the prebuilt ones (see below). Groups are saved in your RuneLite settings (shared by all your accounts).
 - **Off-surface destinations.** These include Zanaris, the Abyss, Mor Ul Rek, the Cosmic entity's plane and the other realms. Each one has a map of its own, opened from the *Elsewhere* section of the side panel or from a portal marker on the surface. Opening one also selects its ring (the first one in your travel log, when an area has two). The orange **Back to Gielinor** button at its top-left returns to the world map. *Your house* (DIQ) has a card.
 - **Ring cards.** Hover over any ring for its code, name and area. The card also shows:
   - whether the ring is in your travel log;
@@ -35,9 +35,9 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
    - **Dials:** switch to the plain dials.
    - **Right-click a ring:** *Zoom to*, or *Clear selection*. Right-click anywhere else on the map, or press **Clear**, to clear the selection.
 4. To use the **Groups** panel:
-   - **Open or close it** with the *Groups* tab on the map's right edge, or the arrow at the panel's top-left. It stays the way you left it.
+   - **Open or close it** with the *Groups* tab on the map's right edge, or the arrow at the panel's top-left. It stays the way you left it (but see *Fixed mode* below).
    - **Add a ring to a group:** right-click the ring (on the map, in the side panel or in another group), then *Add to group* and pick a group. Groups that already have it are marked *(added)*. *New group...* asks for a name in the chatbox and makes a group with that ring in it.
-   - **Make an empty group:** click the **+** at the panel's top-right.
+   - **Make an empty group:** click the **+** at the panel's top-right. You can have up to 30 groups.
    - **Reorder a group:** drag its rings up or down.
    - **Remove a ring:** right-click it in the group, then *Remove from*.
    - **Collapse or expand a group:** click its header.
@@ -68,7 +68,7 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 
 - **Stretched mode.** The map is drawn at the game's own resolution and then stretched along with the rest of the game. It can't be sharper than the game itself.
 - **Use free space.** The game centres the fairy ring interface, and the map grows from its bottom-right corner, where Teleport sits. To let the map fill the screen, the plugin moves that interface's place on screen (never its size) into the corner of the free space while the map shows, and puts it back exactly when you switch to the dials, close the ring, log out or hop. It leaves the place alone if the game or another plugin has already changed it. With Fixed Resizable Hybrid, the interface is moved within that plugin's wider play area. If it clashes with another layout plugin, turn the option off.
-- **Fixed mode.** The map fills the dial area. The side panel (*Favourites* and *Elsewhere*) starts collapsed, and you can open it with its tab.
+- **Fixed mode.** The map fills the dial area. The side panel (*Favourites* and *Elsewhere*) starts collapsed, and you can open it with its tab. The *Groups* panel also starts closed in fixed mode, even if you left it open on a bigger map, until you open it there.
 - **Fairy Ring Map.** That plugin also draws over the dials, so the two are marked as conflicting: RuneLite offers to turn the other off when you enable one. If both are on anyway, the map shows a notice asking you to turn one of them off.
 - **Naming a group** uses RuneLite's own chatbox input, as the core Fairy Rings plugin does for tags. It takes the place of the travel log's search box while you type; reopen the search from the log if you need it.
 - **Memory.** About 30 seconds after you close the fairy ring, the plugin frees its decoded map tiles and image buffers.

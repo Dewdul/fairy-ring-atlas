@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -241,10 +242,9 @@ public class FairyRingAtlasPlugin extends Plugin
 	{
 		repo = RingRepository.load(gson, RESOURCES);
 		// the prebuilt groups seed the panel; without the file there are only the player's own
-		groups = RingGroups.parse(gson, RingGroups.defaults(RingRepository.read(gson, RESOURCES + "groups.json", RingGroups.DefFile.class)),
-			configManager.getConfiguration(FairyRingAtlasConfig.GROUP, KEY_GROUPS));
-		groupsView = groups.view();
-		groupsOpen = Boolean.parseBoolean(configManager.getConfiguration(FairyRingAtlasConfig.GROUP, KEY_GROUPS_OPEN));
+		groupDefaults = RingGroups.defaults(RingRepository.read(gson, RESOURCES + "groups.json", RingGroups.DefFile.class));
+		groups = null;
+		loadGroups();
 		// one worker, newest request first: the tiles of the current view are decoded before the
 		// leftovers of views the player has already zoomed or panned past
 		executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingDeque<Runnable>()
@@ -359,12 +359,21 @@ public class FairyRingAtlasPlugin extends Plugin
 	/** The Groups panel's groups (global, not per account) and whether it is open; hidden config keys. */
 	private static final String KEY_GROUPS = "groups";
 	private static final String KEY_GROUPS_OPEN = "groupsOpen";
+	/** Maps narrower than this (fixed mode) start with the side panels closed. */
+	private static final int NARROW_MAP = 700;
 	/** Client thread; {@link #groupsView} is what the painter and the input thread read. */
 	private RingGroups groups;
+	private List<RingGroups.Def> groupDefaults = Collections.emptyList();
+	/** The saved groups as last read or written here; anything else (another profile) is read again on open. */
+	private String groupsJson;
 	@Getter
 	private volatile List<RingGroups.Group> groupsView = Collections.emptyList();
+	/** Whether the Groups panel is open on the map as last laid out; see {@link #isGroupsOpen(int)}. */
 	@Getter
 	private volatile boolean groupsOpen;
+	private boolean groupsOpenSaved;
+	/** The player's open or close this session; null until they choose (then narrow maps start closed). */
+	private Boolean groupsChoice;
 	@Getter
 	private volatile int groupsScroll;
 	private volatile int groupsScrollMax;
@@ -385,6 +394,7 @@ public class FairyRingAtlasPlugin extends Plugin
 			needsInitialView = true;
 		}
 		faveOrder = FavouriteOrder.parse(configManager.getRSProfileConfiguration(FairyRingAtlasConfig.GROUP, KEY_FAVE_ORDER));
+		loadGroups();
 		repo.readDbTable(client);
 		repo.refreshState(client);
 		search = currentSearch();
@@ -949,7 +959,7 @@ public class FairyRingAtlasPlugin extends Plugin
 
 	private Insets insets(Rectangle rect)
 	{
-		return chromeInsets(isPanelCollapsed(rect.width), groupsOpen, notice != null);
+		return chromeInsets(isPanelCollapsed(rect.width), isGroupsOpen(rect.width), notice != null);
 	}
 
 	/** A layer's view fitted to its bounds, clear of the chrome. */
@@ -1098,32 +1108,28 @@ public class FairyRingAtlasPlugin extends Plugin
 		});
 	}
 
-	/** Input thread: a dragged row was let go at y; move it there in its list and save the order. */
-	void rowDrop(String list, String code, int y)
+	/** Input thread: a dragged row was let go; move it where the drop line showed and save the order. */
+	void rowDrop(String list, String code)
 	{
 		clientThread.invoke(() ->
 		{
 			dragCode = null;
-			List<Rectangle> rows = new ArrayList<>();
-			for (Hit h : hits)
+			ChromePainter.Drop drop = overlay.drop();
+			if (drop == null || !drop.getList().equals(list) || !drop.getCode().equals(code))
 			{
-				if (h.getKind() == Hit.Kind.CHIP && list.equals(h.getId()) && h.getRing() != null && !code.equals(h.getRing().getCode()))
-				{
-					rows.add(h.getArea());
-				}
+				// let go before a frame showed the drag: nothing moves
+				return;
 			}
-			rows.sort((a, b) -> Integer.compare(a.y, b.y));
-			int at = ChromePainter.dropIndex(rows, y);
 			String group = Hit.groupOf(list);
 			if (group != null)
 			{
-				if (groups.move(group, code, at))
+				if (groups.move(group, code, drop.getBefore()))
 				{
 					saveGroups();
 				}
 				return;
 			}
-			List<String> order = FavouriteOrder.move(FavouriteOrder.sort(repo.favouriteRings(), faveOrder), code, at);
+			List<String> order = FavouriteOrder.move(FavouriteOrder.sort(repo.favouriteRings(), faveOrder), code, drop.getBefore());
 			faveOrder = order;
 			configManager.setRSProfileConfiguration(FairyRingAtlasConfig.GROUP, KEY_FAVE_ORDER, FavouriteOrder.format(order));
 		});
@@ -1135,7 +1141,24 @@ public class FairyRingAtlasPlugin extends Plugin
 	private void saveGroups()
 	{
 		groupsView = groups.view();
-		configManager.setConfiguration(FairyRingAtlasConfig.GROUP, KEY_GROUPS, groups.format(gson));
+		groupsJson = groups.format(gson);
+		configManager.setConfiguration(FairyRingAtlasConfig.GROUP, KEY_GROUPS, groupsJson);
+	}
+
+	/**
+	 * The groups and the panel's open state as saved. The plugin stays running across a profile
+	 * switch, so this runs again on each open and rereads groups saved by anything else.
+	 */
+	private void loadGroups()
+	{
+		String json = configManager.getConfiguration(FairyRingAtlasConfig.GROUP, KEY_GROUPS);
+		if (groups == null || !Objects.equals(json, groupsJson))
+		{
+			groups = RingGroups.parse(gson, groupDefaults, json);
+			groupsJson = json;
+			groupsView = groups.view();
+		}
+		groupsOpenSaved = Boolean.parseBoolean(configManager.getConfiguration(FairyRingAtlasConfig.GROUP, KEY_GROUPS_OPEN));
 	}
 
 	private RingGroups.Group group(String id)
@@ -1159,11 +1182,20 @@ public class FairyRingAtlasPlugin extends Plugin
 		return note == null ? null : g.getName() + ": " + note;
 	}
 
+	/** Whether the Groups panel is open for a map of this width: as saved, but closed on a narrow map until opened there. */
+	boolean isGroupsOpen(int mapWidth)
+	{
+		groupsOpen = groupsChoice != null ? groupsChoice : groupsOpenSaved && mapWidth >= NARROW_MAP;
+		return groupsOpen;
+	}
+
 	private void setGroupsOpen(boolean show)
 	{
-		if (groupsOpen != show)
+		groupsChoice = show;
+		groupsOpen = show;
+		if (groupsOpenSaved != show)
 		{
-			groupsOpen = show;
+			groupsOpenSaved = show;
 			configManager.setConfiguration(FairyRingAtlasConfig.GROUP, KEY_GROUPS_OPEN, show);
 		}
 	}
@@ -1180,6 +1212,13 @@ public class FairyRingAtlasPlugin extends Plugin
 	/** Asks for a name in the chatbox, then makes a group (holding the ring, when one is given) and shows it. */
 	private void newGroup(String code)
 	{
+		if (groups.isFull())
+		{
+			chatboxPanelManager.openTextMenuInput("There can be " + RingGroups.GROUPS_MAX + " groups at most. Delete one first.")
+				.option("OK", () -> { })
+				.build();
+			return;
+		}
 		chatboxPanelManager.openTextInput("New group name")
 			.addCharValidator(c -> c != '<' && c != '>')
 			.onDone((Consumer<String>) name -> clientThread.invoke(() ->
@@ -1371,7 +1410,7 @@ public class FairyRingAtlasPlugin extends Plugin
 	/** Whether the Elsewhere panel is collapsed for a map of this width. */
 	boolean isPanelCollapsed(int mapWidth)
 	{
-		panelCollapsedNow = panelChoice != null ? panelChoice : mapWidth < 700;
+		panelCollapsedNow = panelChoice != null ? panelChoice : mapWidth < NARROW_MAP;
 		return panelCollapsedNow;
 	}
 
@@ -1472,8 +1511,8 @@ public class FairyRingAtlasPlugin extends Plugin
 			case BUTTON:
 				if (Hit.NEW_GROUP.equals(hit.getId()))
 				{
-					// prebuilt groups the player deleted come back from here
-					for (RingGroups.Def d : groups.deleted())
+					// prebuilt groups the player deleted come back from here, while there is room
+					for (RingGroups.Def d : groups.isFull() ? Collections.<RingGroups.Def>emptyList() : groups.deleted())
 					{
 						add(menu, "Restore group", d.name, m -> editGroups(() -> groups.restore(d.id)));
 					}

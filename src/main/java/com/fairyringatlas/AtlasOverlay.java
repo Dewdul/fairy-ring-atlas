@@ -92,6 +92,12 @@ public class AtlasOverlay extends Overlay
 		painter.ink().clear();
 	}
 
+	/** Where the dragged row lands as last painted, or null. */
+	ChromePainter.Drop drop()
+	{
+		return chrome.drop;
+	}
+
 	@Override
 	public Dimension render(Graphics2D g)
 	{
@@ -195,7 +201,7 @@ public class AtlasOverlay extends Overlay
 		s.dragList = plugin.getDragList();
 		s.dragCode = plugin.getDragCode();
 		s.dragY = plugin.getDragY();
-		s.groupsOpen = plugin.isGroupsOpen();
+		s.groupsOpen = plugin.isGroupsOpen(v.getW());
 		s.groups = plugin.getGroupsView();
 		s.groupsScroll = plugin.getGroupsScroll();
 		WorldPoint clue = config.clueHelper() ? plugin.getClue() : null;

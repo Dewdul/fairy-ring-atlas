@@ -45,15 +45,15 @@ public class FavouriteOrderTest
 	}
 
 	@Test
-	public void moveToAPosition()
+	public void moveInFrontOfAnother()
 	{
 		List<Ring> shown = rings("CIR", "CJQ", "CKS");
-		assertEquals(Arrays.asList("CKS", "CIR", "CJQ"), FavouriteOrder.move(shown, "CKS", 0));
-		assertEquals(Arrays.asList("CJQ", "CKS", "CIR"), FavouriteOrder.move(shown, "CIR", 2));
-		assertEquals(Arrays.asList("CJQ", "CIR", "CKS"), FavouriteOrder.move(shown, "CIR", 1));
-		// out of range clamps; an unknown code changes nothing
-		assertEquals(Arrays.asList("CJQ", "CKS", "CIR"), FavouriteOrder.move(shown, "CIR", 99));
-		assertEquals(Arrays.asList("CIR", "CJQ", "CKS"), FavouriteOrder.move(shown, "AIQ", 0));
+		assertEquals(Arrays.asList("CKS", "CIR", "CJQ"), FavouriteOrder.move(shown, "CKS", "CIR"));
+		assertEquals(Arrays.asList("CJQ", "CKS", "CIR"), FavouriteOrder.move(shown, "CIR", null));
+		assertEquals(Arrays.asList("CJQ", "CIR", "CKS"), FavouriteOrder.move(shown, "CIR", "CKS"));
+		// an anchor not in the list means the end; an unknown code changes nothing
+		assertEquals(Arrays.asList("CJQ", "CKS", "CIR"), FavouriteOrder.move(shown, "CIR", "ZZZ"));
+		assertEquals(Arrays.asList("CIR", "CJQ", "CKS"), FavouriteOrder.move(shown, "AIQ", "CIR"));
 	}
 
 	@Test

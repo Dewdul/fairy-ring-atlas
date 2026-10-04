@@ -56,7 +56,7 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
 		double rotation = e.getPreciseWheelRotation();
-		if (plugin.inGroups(e.getX(), e.getY()))
+		if (plugin.isGroupsOpen() && plugin.inGroups(e.getX(), e.getY()))
 		{
 			plugin.scrollGroups((int) Math.round(rotation * 24));
 		}
@@ -148,7 +148,7 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			rowCode = null;
 			if (rowDragging)
 			{
-				plugin.rowDrop(rowList, code, e.getY());
+				plugin.rowDrop(rowList, code);
 			}
 			else
 			{

@@ -1238,11 +1238,17 @@ slot, grown by 8 px for their frames), so it never covers Teleport or close.
 - `chromeInsets` takes the open panel off the right side, so fits and pans keep rings clear of it.
 - It is a `LabelPlacer` obstacle, and markers under it get no code label (like the left panel).
 - The card keeps left of the open panel, and clear of the closed tab (`ChromePainter.place`).
-- Rows dim with the search; a header dims when none of its rings match. The wheel scrolls the panel
-  when it overflows.
+- Rows dim with the search; a header dims when none of its rings match. The wheel scrolls the open
+  panel when it overflows; over the closed tab it zooms the map, as over the left panel's tab (the
+  closed panel publishes a scroll limit of 0, so it reopens at the top).
+- Open or closed: the saved `groupsOpen`, except that a map narrower than 700 px (fixed mode) starts
+  closed until the player opens it there, as the left panel starts collapsed
+  (`FairyRingAtlasPlugin.isGroupsOpen(int)`). A toggle is the session's choice at any size and is
+  saved.
 
 **Use.** Clicking a ring row selects it and zooms to it like a favourite (`showFavourite`).
-Hovering it shows its card, with the group's note as a hint line ("Slayer: Kalphites"). Clicking a
+Hovering it shows its card, with the group's note as a hint line ("Slayer: Kurasks, turoths,
+basilisks and more"). Clicking a
 header collapses or expands the group.
 
 **Customising.** Everything is plugin state, changed only through `MenuAction.RUNELITE` entries
@@ -1263,12 +1269,19 @@ from the existing `onPostMenuSort` ownership, and saved locally.
   confirmed with `openTextMenuInput`.
 - Dragging a group's row reorders it, the same way as the Favourites: the press on the row is
   consumed, a move of more than 4 px makes it a drag, and the release decides click or drop
-  (`AtlasInput`, `rowDrag` / `rowDrop`, `ChromePainter.dropIndex`). A row moves only within its own
-  group.
+  (`AtlasInput`, `rowDrag` / `rowDrop`). A row moves only within its own group.
+- The drop goes where the line showed. The painter works out the line from every row of the list,
+  scrolled out of view or not, and records the ring the dragged one goes in front of
+  (`ChromePainter.Drop`, null at the end); `rowDrop` moves the code in front of that ring
+  (`RingGroups.move`, `FavouriteOrder.move`). The visible hits alone would count only the rows in
+  view, and an index would also miss codes the map does not know. A release before any frame
+  painted the drag moves nothing. `ChromePainterTest` drags in a scrolled panel.
 
-**Saving.** Global config, not per account: hidden keys `groups` (compact JSON) and `groupsOpen` in
-group `fairyringatlas`, through `ConfigManager.get/setConfiguration`, with the injected Gson. Nothing
-is written until the player changes something. `RingGroups` is pure and unit tested
+**Saving.** In the active RuneLite profile, not per account: hidden keys `groups` (compact JSON) and
+`groupsOpen` in group `fairyringatlas`, through `ConfigManager.get/setConfiguration`, with the
+injected Gson. Nothing is written until the player changes something. A profile switch does not
+restart a plugin that stays enabled, so both keys are read again on each open, and the groups are
+parsed again when the saved string differs from the one this plugin last read or wrote. `RingGroups` is pure and unit tested
 (`RingGroupsTest`):
 - A saved prebuilt group stores only what differs from its default (name, codes); an edit that
   makes it equal to the default again drops the difference, so an untouched group follows updates to
@@ -1276,8 +1289,11 @@ is written until the player changes something. `RingGroups` is pure and unit tes
   file.
 - `seen` lists every prebuilt id ever offered: a deleted prebuilt group stays deleted, and one added
   by a later update joins at the end.
-- The player's own groups get ids `u1`, `u2`, ...; at most 30 groups. An unreadable saved value
-  falls back to the prebuilt groups.
+- The player's own groups get ids `u1`, `u2`, ...; at most 30 groups (`GROUPS_MAX`). At the cap,
+  *New group* says so in the chatbox and *Restore group* is not offered; a prebuilt group added by an
+  update waits, unseen, until there is room.
+- An unreadable saved value falls back to the prebuilt groups; null or empty ids in `seen` are
+  dropped.
 
 **Threading.** `RingGroups` is changed only on the client thread (menu callbacks, the chatbox
 callbacks, which are passed through `clientThread.invoke` in any case, and `rowDrop`). The painter

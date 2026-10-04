@@ -83,7 +83,8 @@ public class RingGroupsTest
 		assertTrue(g.add("slayer", "cip"));
 		assertFalse(g.add("slayer", "CIP"));
 		assertTrue(g.remove("slayer", "AJR"));
-		assertTrue(g.move("slayer", "CIP", 0));
+		assertTrue(g.move("slayer", "CIP", "AJR"));
+		assertTrue(g.move("slayer", "CIP", "CKS"));
 		assertTrue(g.rename("slayer", "  Tasks <col=ff0000> "));
 		g = roundTrip(g);
 		RingGroups.Group s = group(g, "slayer");
@@ -152,6 +153,67 @@ public class RingGroupsTest
 		List<RingGroups.Group> v = g.view();
 		assertEquals(Arrays.asList("slayer", "u1", "farming"), Arrays.asList(v.get(0).getId(), v.get(1).getId(), v.get(2).getId()));
 		assertEquals(Collections.singletonList("BKS"), v.get(1).getCodes());
+	}
+
+	@Test
+	public void movesAnchorOnTheSavedCodes()
+	{
+		RingGroups g = fresh();
+		// a code the map does not know stays in the list, and the moves go around it
+		String id = g.create("Mine", "AKQ");
+		g.add(id, "ZZZ");
+		g.add(id, "DJR");
+		assertTrue(g.move(id, "DJR", "ZZZ"));
+		assertEquals(Arrays.asList("AKQ", "DJR"), group(g, id).getCodes().subList(0, 2));
+		assertTrue(g.move(id, "AKQ", null));
+		assertEquals("AKQ", group(g, id).getCodes().get(group(g, id).getCodes().size() - 1));
+		assertFalse(g.move(id, "CIR", null));
+	}
+
+	@Test
+	public void theCapHoldsForNewAndRestoredGroups()
+	{
+		RingGroups g = fresh();
+		g.delete("slayer");
+		g.delete("farming");
+		for (int i = 0; i < RingGroups.GROUPS_MAX; i++)
+		{
+			assertNotNull(g.create("G" + i, null));
+		}
+		assertTrue(g.isFull());
+		assertNull(g.create("One more", null));
+		assertFalse(g.restore("slayer"));
+		g = roundTrip(g);
+		assertEquals(RingGroups.GROUPS_MAX, g.view().size());
+		// room again: the deleted prebuilt group comes back, and stays after a reload
+		g.delete(g.view().get(0).getId());
+		assertTrue(g.restore("slayer"));
+		assertNotNull(group(roundTrip(g), "slayer"));
+	}
+
+	@Test
+	public void aPrebuiltGroupNewInAnUpdateWaitsForRoom()
+	{
+		StringBuilder sb = new StringBuilder("{\"groups\":[{\"id\":\"slayer\"}");
+		for (int i = 1; i < RingGroups.GROUPS_MAX; i++)
+		{
+			sb.append(",{\"id\":\"u").append(i).append("\",\"name\":\"G\",\"codes\":[]}");
+		}
+		String full = sb.append("],\"seen\":[\"slayer\"]}").toString();
+		RingGroups g = RingGroups.parse(GSON, defaults(), full);
+		assertNull(group(g, "farming"));
+		g.delete("u1");
+		assertNotNull(group(RingGroups.parse(GSON, defaults(), g.format(GSON)), "farming"));
+	}
+
+	@Test
+	public void aBadSeenListStillSaves()
+	{
+		RingGroups g = RingGroups.parse(GSON, defaults(), "{\"groups\":[{\"id\":\"slayer\"}],\"seen\":[null,\"\",\"slayer\"]}");
+		assertTrue(g.add("slayer", "CIP"));
+		// farming was never seen, so it joins; nothing null is written back
+		assertEquals(2, roundTrip(g).view().size());
+		assertFalse(g.format(GSON).contains("null"));
 	}
 
 	@Test

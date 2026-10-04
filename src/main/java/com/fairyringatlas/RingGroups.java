@@ -145,7 +145,7 @@ final class RingGroups
 			Set<String> ids = new HashSet<>();
 			for (Stored s : saved.groups)
 			{
-				if (s == null || s.id == null || s.id.isEmpty() || !ids.add(s.id) || g.groups.size() >= GROUPS_MAX)
+				if (s == null || s.id == null || s.id.isEmpty() || !ids.add(s.id) || g.isFull())
 				{
 					continue;
 				}
@@ -166,16 +166,21 @@ final class RingGroups
 				g.groups.add(c);
 				g.simplify(c);
 			}
-			if (saved.seen != null)
+			for (String id : saved.seen == null ? Collections.<String>emptyList() : saved.seen)
 			{
-				g.seen.addAll(saved.seen);
+				if (id != null && !id.isEmpty())
+				{
+					g.seen.add(id);
+				}
 			}
 		}
-		// prebuilt groups never offered before (new installs, or added by an update) join at the end
+		// prebuilt groups never offered before (new installs, or added by an update) join at the
+		// end; with no room left one waits, unseen, until there is
 		for (Def d : defaults)
 		{
-			if (g.seen.add(d.id) && g.find(d.id) == null)
+			if (!g.seen.contains(d.id) && g.find(d.id) == null && !g.isFull())
 			{
+				g.seen.add(d.id);
 				g.groups.add(new Stored(d.id));
 			}
 		}
@@ -235,6 +240,12 @@ final class RingGroups
 		return null;
 	}
 
+	/** Whether there are as many groups as there can be: no new or restored ones until one goes. */
+	boolean isFull()
+	{
+		return groups.size() >= GROUPS_MAX;
+	}
+
 	boolean contains(String id, String code)
 	{
 		Stored s = find(id);
@@ -270,8 +281,8 @@ final class RingGroups
 		return true;
 	}
 
-	/** Moves a code to a position within its group. */
-	boolean move(String id, String code, int index)
+	/** Moves a code within its group to just before another one (null, or one not there: to the end). */
+	boolean move(String id, String code, String before)
 	{
 		Stored s = find(id);
 		if (s == null || !codes(s).contains(code))
@@ -280,7 +291,8 @@ final class RingGroups
 		}
 		List<String> list = new ArrayList<>(codes(s));
 		list.remove(code);
-		list.add(Math.max(0, Math.min(index, list.size())), code);
+		int at = list.indexOf(before);
+		list.add(at < 0 ? list.size() : at, code);
 		s.codes = list;
 		simplify(s);
 		return true;
@@ -331,7 +343,7 @@ final class RingGroups
 	/** A deleted prebuilt group back, as bundled, at the end. */
 	boolean restore(String id)
 	{
-		if (def(id) == null || find(id) != null)
+		if (def(id) == null || find(id) != null || isFull())
 		{
 			return false;
 		}
@@ -343,7 +355,7 @@ final class RingGroups
 	String create(String name, String code)
 	{
 		String n = cleanName(name);
-		if (n == null || groups.size() >= GROUPS_MAX)
+		if (n == null || isFull())
 		{
 			return null;
 		}

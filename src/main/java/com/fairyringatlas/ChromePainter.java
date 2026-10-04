@@ -18,6 +18,7 @@ import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Value;
 
 /**
  * The map's chrome in an OSRS style: dark stone frame, the top bar with breadcrumb, dial readout
@@ -118,6 +119,7 @@ public class ChromePainter
 			lg.translate(-v.getX(), -v.getY());
 			lg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			int mark = s.hits.size();
+			drop = null;
 			paintPanel(lg, s);
 			paintGroups(lg, s);
 			paintTopBar(lg, s);
@@ -173,6 +175,7 @@ public class ChromePainter
 		layerHits.clear();
 		layerCard = null;
 		layerKey = 0;
+		drop = null;
 	}
 
 	// ------------------------------------------------------------------ top bar
@@ -521,6 +524,7 @@ public class ChromePainter
 		int top = y;
 		Composite oldComp = g.getComposite();
 		List<Rectangle> others = new ArrayList<>();
+		List<Ring> otherRings = new ArrayList<>();
 		Ring dragged = null;
 		for (Ring r : rings)
 		{
@@ -540,6 +544,7 @@ public class ChromePainter
 			else
 			{
 				others.add(row);
+				otherRings.add(r);
 			}
 			if (content.intersects(row))
 			{
@@ -551,6 +556,7 @@ public class ChromePainter
 		{
 			// where the row would land, and the row itself under the pointer
 			int at = dropIndex(others, s.dragY);
+			drop = new Drop(list, dragged.getCode(), at < otherRings.size() ? otherRings.get(at).getCode() : null);
 			int lineY = others.isEmpty() ? top : at < others.size() ? others.get(at).y - 2
 				: others.get(others.size() - 1).y + others.get(others.size() - 1).height + 1;
 			g.setColor(TITLE);
@@ -566,7 +572,7 @@ public class ChromePainter
 	}
 
 	/** Where a dragged row lands among the other rows of its list: before the first row below the pointer. */
-	static int dropIndex(List<Rectangle> rows, int y)
+	private static int dropIndex(List<Rectangle> rows, int y)
 	{
 		int at = 0;
 		for (Rectangle r : rows)
@@ -600,6 +606,21 @@ public class ChromePainter
 	/** Largest useful panel scroll of the last paint, for the input handler to clamp to. */
 	volatile int panelScrollMax;
 	volatile int groupsScrollMax;
+
+	/**
+	 * Where the dragged row lands as last painted, so the drop is where the line showed (the
+	 * line counts every row of the list, the hits only the ones in view); null with no drag.
+	 */
+	volatile Drop drop;
+
+	/** A dragged row: its list and ring, and the ring it goes in front of (null: the end). */
+	@Value
+	static class Drop
+	{
+		String list;
+		String code;
+		String before;
+	}
 
 	// ------------------------------------------------------------------ Groups panel
 
@@ -671,6 +692,7 @@ public class ChromePainter
 		}
 		if (!s.groupsOpen)
 		{
+			groupsScrollMax = 0;
 			s.hits.add(new Hit(Hit.Kind.BUTTON, p, null, Hit.TOGGLE_GROUPS, "Show", GROUPS_NAME));
 			if (matches)
 			{
