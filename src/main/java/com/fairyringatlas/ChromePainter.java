@@ -714,7 +714,9 @@ public class ChromePainter
 		}
 		if (ring.isDialable())
 		{
+			boolean house = "DIQ".equals(ring.getCode());
 			StringBuilder status = new StringBuilder(visited ? (full ? "Unlocked - in your travel log" : "Unlocked")
+				: house ? "Not used yet - needs a fairy ring in your house"
 				: (full ? "Locked - not in your travel log yet" : "Locked - not in your travel log"));
 			if (s.repo.isFavourite(ring.getCode()))
 			{
@@ -819,7 +821,9 @@ public class ChromePainter
 			}
 			else
 			{
-				step = new Line("Locked: dial it by hand (orange button), then Teleport:", ink.small, HINT, 6);
+				// the house's ring is only there once built in the garden; otherwise the code goes nowhere
+				step = new Line("DIQ".equals(code) ? "Build a fairy ring in your house's garden first; then dial DIQ by hand:"
+					: "Locked: dial it by hand (orange button), then Teleport:", ink.small, HINT, 6);
 				dialRow = s.dials != null;
 			}
 		}
@@ -1067,7 +1071,7 @@ public class ChromePainter
 			g.setColor(hover ? Color.WHITE : new Color(0xFFD08A));
 			g.drawRoundRect(slot.x, slot.y, slot.width - 1, slot.height - 1, 7, 7);
 			String title = ink.fit("Dial " + r.getCode() + " by hand", ink.bold, slot.width - 8);
-			String why = ink.fit("Click to show the dials", ink.small, slot.width - 8);
+			String why = ink.fit("DIQ".equals(r.getCode()) ? "Needs a ring in your house" : "Click to show the dials", ink.small, slot.width - 8);
 			int y = slot.y + (slot.height - ink.height(ink.bold) - ink.height(ink.small)) / 2;
 			ink.text(g, title, ink.bold, Ink.DARK, slot.x + (slot.width - ink.width(ink.bold, title)) / 2, y, Ink.Style.PLAIN);
 			ink.text(g, why, ink.small, Ink.DARK, slot.x + (slot.width - ink.width(ink.small, why)) / 2,
