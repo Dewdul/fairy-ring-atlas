@@ -29,6 +29,11 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	private final FairyRingAtlasPlugin plugin;
 	private volatile boolean dragging;
 	private volatile boolean swallow;
+	/** The favourite row the press landed on (a click selects it, a drag reorders the list). */
+	private volatile String faveCode;
+	private volatile boolean faveDragging;
+	private int pressX;
+	private int pressY;
 	private int lastX;
 	private int lastY;
 
@@ -70,6 +75,17 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			return e;
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
+		if (hit != null && hit.getKind() == Hit.Kind.CHIP && Hit.FAVE.equals(hit.getId()) && hit.getRing() != null)
+		{
+			// a favourite row: click or drag is only known on release, so the press stays with us
+			faveCode = hit.getRing().getCode();
+			faveDragging = false;
+			pressX = e.getX();
+			pressY = e.getY();
+			swallow = true;
+			e.consume();
+			return e;
+		}
 		if (hit != null && hit.isActionable() && plugin.isMenuFor(hit))
 		{
 			// the game runs the top menu entry, which is ours for this very hit
@@ -89,6 +105,20 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseDragged(MouseEvent e)
 	{
+		String code = faveCode;
+		if (code != null)
+		{
+			if (!faveDragging && Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) > 4)
+			{
+				faveDragging = true;
+			}
+			if (faveDragging)
+			{
+				plugin.faveDrag(code, e.getY());
+			}
+			// not consumed, as for a pan
+			return e;
+		}
 		if (dragging)
 		{
 			plugin.panBy(e.getX() - lastX, e.getY() - lastY);
@@ -103,6 +133,20 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseReleased(MouseEvent e)
 	{
+		String code = faveCode;
+		if (code != null)
+		{
+			faveCode = null;
+			if (faveDragging)
+			{
+				plugin.faveDrop(code, e.getY());
+			}
+			else
+			{
+				plugin.faveClick(code);
+			}
+			faveDragging = false;
+		}
 		if (dragging || swallow)
 		{
 			dragging = false;
@@ -126,5 +170,7 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	{
 		dragging = false;
 		swallow = false;
+		faveCode = null;
+		faveDragging = false;
 	}
 }

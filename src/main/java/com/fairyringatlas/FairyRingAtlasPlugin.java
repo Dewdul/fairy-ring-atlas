@@ -137,6 +137,8 @@ public class FairyRingAtlasPlugin extends Plugin
 	@Inject
 	private FairyRingAtlasConfig config;
 	@Inject
+	private ConfigManager configManager;
+	@Inject
 	private OverlayManager overlayManager;
 	@Inject
 	private MouseManager mouseManager;
@@ -333,6 +335,16 @@ public class FairyRingAtlasPlugin extends Plugin
 		}
 	}
 
+	/** The player's own order for the side panel's Favourites list, saved per account. */
+	@Getter
+	private volatile List<String> faveOrder = Collections.emptyList();
+	/** The favourite row being dragged (input thread), or null; and the pointer's y. */
+	@Getter
+	private volatile String dragFave;
+	@Getter
+	private volatile int dragY;
+	private static final String KEY_FAVE_ORDER = "favouriteOrder";
+
 	private void onDialsOpened()
 	{
 		int tick = client.getTickCount();
@@ -347,6 +359,7 @@ public class FairyRingAtlasPlugin extends Plugin
 			panelScroll = 0;
 			needsInitialView = true;
 		}
+		faveOrder = FavouriteOrder.parse(configManager.getRSProfileConfiguration(FairyRingAtlasConfig.GROUP, KEY_FAVE_ORDER));
 		repo.readDbTable(client);
 		repo.refreshState(client);
 		search = currentSearch();
@@ -1031,6 +1044,48 @@ public class FairyRingAtlasPlugin extends Plugin
 		openLayer(r.getLayer());
 		MapView v = view;
 		animateTo(v.focusOn(r.getX() + 0.5, r.getY() + 0.5, Math.max(v.getPpt() * 2, 4), insets(v.rect())));
+	}
+
+	/** Input thread: a favourite row is being dragged to y. */
+	void faveDrag(String code, int y)
+	{
+		dragY = y;
+		dragFave = code;
+	}
+
+	/** Input thread: a favourite row was clicked (not dragged); select it. */
+	void faveClick(String code)
+	{
+		clientThread.invoke(() ->
+		{
+			Ring r = repo.ring(code);
+			if (r != null && open)
+			{
+				showFavourite(r);
+			}
+		});
+	}
+
+	/** Input thread: a dragged favourite was let go at y; move it there and save the order. */
+	void faveDrop(String code, int y)
+	{
+		clientThread.invoke(() ->
+		{
+			dragFave = null;
+			List<Rectangle> rows = new ArrayList<>();
+			for (Hit h : hits)
+			{
+				if (h.getKind() == Hit.Kind.CHIP && Hit.FAVE.equals(h.getId()) && h.getRing() != null && !code.equals(h.getRing().getCode()))
+				{
+					rows.add(h.getArea());
+				}
+			}
+			rows.sort((a, b) -> Integer.compare(a.y, b.y));
+			List<String> order = FavouriteOrder.move(FavouriteOrder.sort(repo.favouriteRings(), faveOrder), code,
+				ChromePainter.dropIndex(rows, y));
+			faveOrder = order;
+			configManager.setRSProfileConfiguration(FairyRingAtlasConfig.GROUP, KEY_FAVE_ORDER, FavouriteOrder.format(order));
+		});
 	}
 
 	/** A row in the Favourites list: select the ring and bring it into view, close enough to read. */

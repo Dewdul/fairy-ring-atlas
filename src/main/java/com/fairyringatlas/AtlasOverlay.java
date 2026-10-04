@@ -189,6 +189,9 @@ public class AtlasOverlay extends Overlay
 		s.notice = plugin.getNotice();
 		s.panelCollapsed = plugin.isPanelCollapsed(v.getW());
 		s.panelScroll = plugin.getPanelScroll();
+		s.faveOrder = plugin.getFaveOrder();
+		s.dragFave = plugin.getDragFave();
+		s.dragY = plugin.getDragY();
 		WorldPoint clue = config.clueHelper() ? plugin.getClue() : null;
 		s.clueX = clue == null ? Double.NaN : clue.getX();
 		s.clueY = clue == null ? Double.NaN : clue.getY();
