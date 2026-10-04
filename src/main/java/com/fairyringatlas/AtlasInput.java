@@ -35,6 +35,9 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	/** The marker or portal under the press: clicked on release unless the press became a drag. */
 	private volatile Hit pending;
 	private volatile boolean moved;
+	/** The favourite row the press landed on (a click selects it, a drag reorders the list). */
+	private volatile String faveCode;
+	private volatile boolean faveDragging;
 	private int pressX;
 	private int pressY;
 	private int lastX;
@@ -78,6 +81,17 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			return e;
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
+		if (hit != null && hit.getKind() == Hit.Kind.CHIP && Hit.FAVE.equals(hit.getId()) && hit.getRing() != null)
+		{
+			// a favourite row: click or drag is only known on release, so the press stays with us
+			faveCode = hit.getRing().getCode();
+			faveDragging = false;
+			pressX = e.getX();
+			pressY = e.getY();
+			swallow = true;
+			e.consume();
+			return e;
+		}
 		if (hit != null && (hit.getKind() == Hit.Kind.MARKER || hit.getKind() == Hit.Kind.PORTAL))
 		{
 			// a click selects it, a drag pans the map; which one is only known on release
@@ -111,6 +125,20 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseDragged(MouseEvent e)
 	{
+		String code = faveCode;
+		if (code != null)
+		{
+			if (!faveDragging && Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) > CLICK_SLOP)
+			{
+				faveDragging = true;
+			}
+			if (faveDragging)
+			{
+				plugin.faveDrag(code, e.getY());
+			}
+			// not consumed, as for a pan
+			return e;
+		}
 		if (dragging && pending != null && !moved)
 		{
 			if (Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) <= CLICK_SLOP)
@@ -134,6 +162,20 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseReleased(MouseEvent e)
 	{
+		String code = faveCode;
+		if (code != null)
+		{
+			faveCode = null;
+			if (faveDragging)
+			{
+				plugin.faveDrop(code, e.getY());
+			}
+			else
+			{
+				plugin.faveClick(code);
+			}
+			faveDragging = false;
+		}
 		Hit hit = pending;
 		if (hit != null)
 		{
@@ -168,5 +210,7 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 		swallow = false;
 		pending = null;
 		moved = false;
+		faveCode = null;
+		faveDragging = false;
 	}
 }

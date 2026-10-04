@@ -150,6 +150,7 @@ public class ChromePainter
 		boolean flash = s.now < s.flashUntil && (s.now / 250) % 2 == 0;
 		return java.util.Objects.hash(v.getX(), v.getY(), v.getW(), v.getH(), v.getLayer(), s.selected, s.hovered,
 			java.util.Arrays.hashCode(s.dials), s.query, s.rowVisible, s.notice, s.panelCollapsed, s.panelScroll,
+			s.faveOrder, s.dragFave, s.dragFave == null ? 0 : s.dragY,
 			s.now < s.flashUntil, flash, hover, s.holes, s.teleportSlot, s.repo.getStateHash(), s.here,
 			s.visitedColor, s.selectedColor, s.favouriteColor, s.fullDetails, focusCovered(s));
 	}
@@ -485,13 +486,13 @@ public class ChromePainter
 	}
 
 	/**
-	 * The Favourites list at the top of the panel, one row per favourite in favourites-block
-	 * order. Returns the y below it.
+	 * The Favourites list at the top of the panel, one row per favourite in the player's own
+	 * order (dragging a row moves it). Returns the y below it.
 	 */
 	private int paintFavourites(Graphics2D g, Scene s, Rectangle content, int y)
 	{
 		int sh = ink.height(ink.small);
-		List<Ring> faves = s.repo.favouriteRings();
+		List<Ring> faves = FavouriteOrder.sort(s.repo.favouriteRings(), s.faveOrder);
 		if (faves.isEmpty())
 		{
 			for (String t : ink.wrap("Star a code in your travel log to list it here.", ink.small, content.width - 8))
@@ -502,35 +503,81 @@ public class ChromePainter
 			return y + 12;
 		}
 		Composite oldComp = g.getComposite();
+		List<Rectangle> others = new ArrayList<>();
+		Ring dragged = null;
 		for (Ring r : faves)
 		{
 			Rectangle row = new Rectangle(content.x, y, content.width, sh + 6);
-			boolean sel = r.getCode().equals(s.selected);
-			boolean hover = s.mouse != null && row.contains(s.mouse) && content.contains(s.mouse);
-			if (s.searching() && !r.matches(s.query))
+			boolean drag = r.getCode().equals(s.dragFave);
+			boolean hover = s.dragFave == null && s.mouse != null && row.contains(s.mouse) && content.contains(s.mouse);
+			if (drag || (s.searching() && !r.matches(s.query)))
 			{
-				g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
+				g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, drag ? 0.3f : 0.4f));
 			}
-			if (sel || hover)
-			{
-				g.setColor(sel ? new Color(70, 52, 30, 240) : FILL_LIGHT);
-				g.fillRoundRect(row.x, row.y, row.width, row.height, 6, 6);
-				g.setColor(sel ? TITLE : BRONZE_LIGHT);
-				g.setStroke(new BasicStroke(1f));
-				g.drawRoundRect(row.x, row.y, row.width - 1, row.height - 1, 6, 6);
-			}
-			Rectangle chip = new Rectangle(row.x + 3, row.y + 2, chipWidth(s, r), sh + 2);
-			chip(g, s, r, chip);
-			int tx = chip.x + chip.width + 5;
-			ink.text(g, ink.fit(s.repo.displayName(r), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
+			paintFaveRow(g, s, r, row, hover);
 			g.setComposite(oldComp);
+			if (drag)
+			{
+				dragged = r;
+			}
+			else
+			{
+				others.add(row);
+			}
 			if (content.intersects(row))
 			{
 				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, Hit.FAVE, "Select", r.getCode() + " " + s.repo.displayName(r)));
 			}
 			y += row.height + 2;
 		}
+		if (dragged != null)
+		{
+			// where the row would land, and the row itself under the pointer
+			int at = dropIndex(others, s.dragY);
+			int lineY = others.isEmpty() ? content.y : at < others.size() ? others.get(at).y - 2
+				: others.get(others.size() - 1).y + others.get(others.size() - 1).height + 1;
+			g.setColor(TITLE);
+			g.fillRect(content.x + 2, lineY - 1, content.width - 4, 2);
+			Rectangle ghost = new Rectangle(content.x, s.dragY - (sh + 6) / 2, content.width, sh + 6);
+			g.setColor(new Color(0, 0, 0, 120));
+			g.fillRoundRect(ghost.x + 2, ghost.y + 3, ghost.width, ghost.height, 6, 6);
+			g.setColor(FILL_LIGHT);
+			g.fillRoundRect(ghost.x, ghost.y, ghost.width, ghost.height, 6, 6);
+			paintFaveRow(g, s, dragged, ghost, true);
+		}
 		return y + 8;
+	}
+
+	/** Where a dragged favourite lands among the other rows: before the first row below the pointer. */
+	static int dropIndex(List<Rectangle> rows, int y)
+	{
+		int at = 0;
+		for (Rectangle r : rows)
+		{
+			if (y > r.y + r.height / 2)
+			{
+				at++;
+			}
+		}
+		return at;
+	}
+
+	private void paintFaveRow(Graphics2D g, Scene s, Ring r, Rectangle row, boolean hover)
+	{
+		int sh = ink.height(ink.small);
+		boolean sel = r.getCode().equals(s.selected);
+		if (sel || hover)
+		{
+			g.setColor(sel ? new Color(70, 52, 30, 240) : FILL_LIGHT);
+			g.fillRoundRect(row.x, row.y, row.width, row.height, 6, 6);
+			g.setColor(sel ? TITLE : BRONZE_LIGHT);
+			g.setStroke(new BasicStroke(1f));
+			g.drawRoundRect(row.x, row.y, row.width - 1, row.height - 1, 6, 6);
+		}
+		Rectangle chip = new Rectangle(row.x + 3, row.y + 2, chipWidth(s, r), sh + 2);
+		chip(g, s, r, chip);
+		int tx = chip.x + chip.width + 5;
+		ink.text(g, ink.fit(s.repo.displayName(r), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
 	}
 
 	/** Largest useful panel scroll of the last paint, for the input handler to clamp to. */

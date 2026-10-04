@@ -51,6 +51,11 @@ public final class Scene
 	public long flashUntil;
 	public String notice;
 	public boolean panelCollapsed;
+	/** The player's own order for the Favourites list (codes); may be empty. */
+	public List<String> faveOrder = new ArrayList<>();
+	/** The favourite being dragged to a new place in the list, or null; and the pointer's y. */
+	public String dragFave;
+	public int dragY;
 	public int panelScroll;
 	public double clueX = Double.NaN;
 	public double clueY = Double.NaN;
