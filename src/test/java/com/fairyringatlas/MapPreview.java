@@ -207,7 +207,8 @@ public class MapPreview
 		s.clueY = 3165;
 		s.rowVisible = true;
 
-		BufferedImage canvas = new BufferedImage(rect.x * 2 + rect.width, rect.y * 2 + rect.height, BufferedImage.TYPE_INT_RGB);
+		// room on the right for a stand-in travel log, as in resizable mode
+		BufferedImage canvas = new BufferedImage(rect.x * 2 + rect.width + 230, rect.y * 2 + rect.height, BufferedImage.TYPE_INT_RGB);
 		Graphics2D g = canvas.createGraphics();
 		g.setColor(new Color(0x2a2620));
 		g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
@@ -278,6 +279,21 @@ public class MapPreview
 			chrome.paintHoles(g, s, s.dialsMatch(selected));
 		}
 		System.out.printf("   blit=%.2f map=%.2f chrome=%.2f ms%n", parts[0] / 20e6, parts[1] / 20e6, parts[2] / 20e6);
+		// a stand-in travel log with the selected ring's row, and the leader from Teleport to it
+		Ring sel = repo.ring(selected);
+		if (sel != null && repo.hasLogRow(sel.getCode()) && !s.dialsMatch(selected))
+		{
+			Rectangle log = new Rectangle(rect.x + rect.width + 24, rect.y + rect.height - 261, 190, 261);
+			g.setColor(new Color(0x3e3529));
+			g.fill(log);
+			g.setColor(new Color(0x5a4b36));
+			g.draw(log);
+			Rectangle row = new Rectangle(log.x + 8, log.y + 46, 160, 40);
+			g.setColor(new Color(0xFF981F));
+			g.drawString(sel.getCode() + " " + sel.getName(), row.x + 4, row.y + 24);
+			AtlasOverlay.paintRowHighlight(g, row, s.teleportSlot != null ? AtlasPainter.grow(s.teleportSlot, 4) : s.card,
+				s.blockers(), s.selectedColor, s.now);
+		}
 		g.dispose();
 		ImageIO.write(canvas, "png", new File(out, name + ".png"));
 		System.out.printf("%-18s ppt=%6.3f z=%d  base(cold)=%6.1f ms  base(warm)=%5.1f ms  first paint=%5.1f ms  frame=%5.2f ms  hits=%d%n",

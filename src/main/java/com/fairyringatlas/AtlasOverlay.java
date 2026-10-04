@@ -167,7 +167,11 @@ public class AtlasOverlay extends Overlay
 		chrome.paintHoles(g, scene, ready);
 		if (row != null)
 		{
-			paintRowHighlight(g, row, scene.card != null ? scene.card : rect, scene.blockers(), config.selectedColor(), scene.now);
+			// the leader runs from Teleport (where the player goes next) to the log row; without a
+			// Teleport slot, from the card or the map
+			Rectangle from = scene.teleportSlot != null ? AtlasPainter.grow(scene.teleportSlot, 4)
+				: scene.card != null ? scene.card : rect;
+			paintRowHighlight(g, row, from, scene.blockers(), config.selectedColor(), scene.now);
 		}
 		plugin.publish(new ArrayList<>(scene.hits), holes, scene.panel, chrome.panelScrollMax, null);
 		return null;
