@@ -40,7 +40,7 @@ public class RingDataTest
 
 	/** Hub limits: the bot rejects an image whose decoded size (w*h*4) is about 1 MiB or more. */
 	private static final long MAX_DECODED = 950_000;
-	private static final long MAX_RESOURCES = 6_815_744; // 6.5 MiB, DESIGN section 1
+	private static final long MAX_RESOURCES = 7_969_177; // 7.6 MiB, DESIGN section 1
 	private static final File RESOURCE_DIR = new File("src/main/resources");
 	/** Bytes of Java and JSON text in src/main (about 312 KB today); DESIGN Deviations, "Size". */
 	private static final long MAX_SOURCE_TEXT = 300_000;

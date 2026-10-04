@@ -64,8 +64,8 @@ reviewer rulings. Breaking one gets the plugin rejected.
 5. **No network access at runtime.** All imagery and data are bundled.
 6. **Image budget.** The hub bot rejects any bundled image whose decoded size
    (w*h*4) is about 1 MiB or more. Every bundled PNG is therefore at most
-   256x256. Keep total bundled resources at **6.5 MiB or less** so the jar
-   stays near 7 MiB; the hard cap is 10 MiB and a warning appears above 8.
+   256x256. Keep total bundled resources at **7.6 MiB or less** so the jar
+   stays under 8 MiB, where the hub starts warning; the hard cap is 10 MiB.
 7. **No keyboard capture by default.** The game auto-opens its own chatbox
    search when the log opens, and typing must keep working.
    - Search is read passively from `VarClientID.FAIRYRINGS_SEARCHSTRING` (1344).
@@ -286,7 +286,7 @@ research dataset.
 
 | id | name | rings | rough bounds (world tiles) |
 |---|---|---|---|
-| surface | Gielinor | the 42 surface rings | crop x 1152–3776, y 2368–4032 (generator may tighten to all rings ±1 region) |
+| surface | Gielinor | the 42 surface rings | the whole surface: x 1016–3976, y 2104–4168 (see Deviations) |
 | zanaris | Zanaris | BKS, hideout sequence landing (2328,4426), Zanaris exits | [2304,4288]–[2560,4544] |
 | abyss | The Abyss | ALR (Abyssal Area) and DIP (Abyssal Nexus) | [2880,4672]–[3200,4992] |
 | dorgesh_south | Dorgesh-Kaan South Dungeon | AJQ | [2624,5120]–[2816,5312] |
@@ -839,9 +839,14 @@ default font when `FontManager` is unavailable).
   regions are not shipped, and pixels outside a layer's bounds are painted
   with its background. Mor Ul Rek is 3x2 regions, [2368,5056]-[2560,5184]
   (the row above is empty). Every ring still lies inside its layer.
-- **Surface bounds** are the surface rings' bounding box ±2 regions:
-  [1152,2304]-[3776,4032]. That is one region further south than 3.3's
-  y 2368, because CJQ (The Great Conch) is at y 2447.
+- **Surface bounds** are the whole surface, [1016,2104]-[3976,4168]. The
+  world map's own "Gielinor Surface" shows the map squares rx 15-62,
+  ry 32-65 (x 960-4032, y 2048-4224; all 1632 hold map data), and their
+  outermost 56 tiles on every side are void, so the bounds are the content
+  inside that frame. The frame's pixels in the edge tiles are painted open
+  sea. Before 2026-10-04 the surface was cropped to the surface rings'
+  bounding box ±2 regions, [1152,2304]-[3776,4032], which cut off the east of
+  Fossil Island, the west of Zeah and Varlamore and the far north and south.
 - **No `poh` entry in `index.json` `layers`.** It has no map. The plugin
   treats `poh` as a card-only layer.
 - **Labels** carry an optional `c`, the in-game text colour such as
@@ -1002,7 +1007,8 @@ default font when `FontManager` is unavailable).
   The test also checks that:
   - the tiles on disk and the tiles in `index.json` match exactly;
   - every bundled image is at most 256x256 and decodes to under 950,000 bytes;
-  - `src/main/resources` is at most 6.5 MiB;
+  - `src/main/resources` is at most 7.6 MiB (6.5 MiB before the surface grew
+    to the whole world on 2026-10-04);
   - every ring's layer is in `index.json` itself, not only in the built-in
     defaults.
 - **No code label for a marker under the chrome.** When a marker sits under
