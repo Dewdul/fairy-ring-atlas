@@ -6,15 +6,10 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 
 - **Map of every ring.** All 42 surface rings appear on a world map. You can zoom from an overview of the whole map down to individual buildings: scroll to zoom and drag to pan.
 - **Names in the ring's own menu.** Right-click a fairy ring and *Last-destination (AJR)* reads *Last (AJR) Fremennik Slayer Dungeon*, and the *Favourites* codes show the destination's name, e.g. *CIR Mount Karuulm*. Entries Fairy Ring Favourites has already renamed are left alone.
-- **Your house.** DIQ is drawn at your house portal (Rimmington, Taverley, Pollnivneach, Rellekka, Brimhaven, Yanille, Hosidius or Aldarin), and the *Your house* card zooms to it. It shows as locked until you have used a fairy ring in your house.
+- **Your house.** DIQ is drawn at your house portal (Rimmington, Taverley, Pollnivneach, Rellekka, Brimhaven, Yanille, Hosidius or Aldarin), and the *Your house* card zooms to it. It shows as locked until you have used a fairy ring in your house. (A house in Prifddinas is outside the bundled map, so DIQ is shown on its card only.)
 - **Favourites list.** Your in-game favourites (starred in the travel log) are listed at the top of the side panel. Click one to select it and zoom to it. Its card also reminds you of the game's own one-click teleport: right-click any fairy ring, then *Favourites*. Your last destination gets the same tip for *Last-destination*.
 - **Off-surface destinations.** These include Zanaris, the Abyss, Mor Ul Rek, the Cosmic entity's plane and the other realms. Each one has a map of its own, opened from the *Elsewhere* section of the side panel or from a portal marker on the surface. Opening one also selects its ring (the first one in your travel log, when an area has two). The orange **Back to Gielinor** button at its top-left returns to the world map. *Your house* (DIQ) has a card.
-- **Ring cards.** Hover over any ring for its code, name and area. The card also shows:
-  - whether the ring is in your travel log;
-  - what is nearby;
-  - quest, skill and item requirements;
-  - dangers;
-  - on rings you can leave without a staff, a line saying so (unless you have the elite Lumbridge & Draynor Diary).
+- **Ring cards.** Hover over any ring for a short card: its code and name, whether it is unlocked (in your travel log), what is nearby, its requirements while it is still locked, and its main danger. Turn on *Full ring details* for the full card: area, description, every requirement and danger, notes, and on rings you can leave without a staff a line saying so (unless you have the elite Lumbridge & Draynor Diary).
 - **Marker states.** Markers show at a glance which rings are in your travel log, which are favourites, your last destination, the ring you are standing at and the code currently on the dials.
 - **Travel log search.** Typing in the game's own travel log search dims the rings that don't match and zooms the map to the ones that do.
 - **Clue helper.** The map marks your active clue location, and a fairy ring clue's code is selected for you. This needs the core *Clue Scroll* plugin to be enabled. A hot-cold clue is marked once it is solved.
@@ -29,14 +24,14 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 3. To navigate:
    - **Mouse wheel:** zoom.
    - **Drag:** pan.
-   - **`+` / `-`:** zoom in and out.
+   - **+ / - buttons:** zoom in and out.
    - **Fit:** show every ring on this map (on an underground map, the whole area).
    - **Dials:** switch to the plain dials.
-   - **Right-click a ring:** *Zoom to*, or *Clear selection*. Right-click anywhere else on the map, or press **Clear**, to clear the selection.
+   - **Right-click a ring:** *Select*, *Zoom to* or *Clear selection*. Right-click anywhere else on the map, or press **Clear**, to clear the selection.
 
 ### Why clicking the map doesn't teleport you
 
-RuneLite plugins may not act in the game for you. They can't send clicks, turn dials or choose a travel log entry. A click on the map therefore only selects a ring. The plugin then highlights the real log row, or shows you the dial turns, and you make those clicks yourself: the travel log row (or the dials) is what sets the code for **Teleport**. The plugin changes the fairy ring interfaces only while they are open: it hides the dials under the map, and narrows and recolours the travel log (in map or dial mode). Under the map it also removes the game's own right-click options, such as *Walk here*. It puts everything back when you close the interface.
+RuneLite plugins may not act in the game for you. They can't send clicks, turn dials or choose a travel log entry. A click on the map therefore only selects a ring. The plugin then highlights the real log row, or shows you the dial turns, and you make those clicks yourself: the travel log row (or the dials) is what sets the code for **Teleport**. The plugin changes the fairy ring interfaces only while they are open: it hides the dials under the map, and narrows and recolours the travel log (in map or dial mode). Under the map it also removes the game's own right-click options, such as *Walk here*. It moves the Teleport and close buttons into the map's bottom-right corner and turns off the game's mouse-over text (top-left) while the map shows; with Use free space it also moves the dial interface's place on screen (see the notes). It puts everything back when you close the interface.
 
 ## Settings
 
@@ -48,11 +43,13 @@ RuneLite plugins may not act in the game for you. They can't send clicks, turn d
 | | Open at | Around you | Centre on the ring you are standing at (*Around you*), *Fit all* rings, or *Remember* the last view this session |
 | | Place names / Map icons | on | World map place names, and icons when zoomed in |
 | | Fit to search | on | Zoom to the rings that match the travel log search |
+| | Full ring details | off | Show everything about a ring on its card (description, every nearby place, notes) instead of a short summary |
 | Markers | Code labels | All | Show codes for *All* rings, *Favourites* only, or *None* |
-| | Dim unvisited | off | Draw rings that aren't in your log at half opacity |
+| | Dim locked rings | off | Draw rings you have not unlocked (not in your travel log yet) at half opacity |
 | | Visited / Selected / Favourite colour | teal / orange / gold | Marker colours |
 | Travel log | Filter travel log | on | Narrow the log to the selected ring, moved to the top |
 | | Dial guidance | on | Turn arrows on the dials for the selected ring |
+| | Names in ring menu | on | Destination names in a fairy ring's right-click menu (Last-destination and the Favourites codes) |
 | Advanced | Clue helper | on | Mark the active clue and preselect fairy ring clue codes (needs the core Clue Scroll plugin) |
 
 ## Notes

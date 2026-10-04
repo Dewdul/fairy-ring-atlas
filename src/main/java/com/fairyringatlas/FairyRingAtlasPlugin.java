@@ -259,6 +259,10 @@ public class FairyRingAtlasPlugin extends Plugin
 		log.debug("started: rings={} index={} imagery={}", repo.isRingsLoaded(), repo.isIndexLoaded(), tiles.hasImagery());
 		clientThread.invokeLater(() ->
 		{
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				repo.placeHouse(client.getVarbitValue(VarbitID.POH_HOUSE_LOCATION));
+			}
 			if (client.getGameState() == GameState.LOGGED_IN && isDialsVisible() && !open)
 			{
 				onDialsOpened();
@@ -639,6 +643,11 @@ public class FairyRingAtlasPlugin extends Plugin
 	public void onVarbitChanged(VarbitChanged e)
 	{
 		int id = e.getVarbitId();
+		if (id == VarbitID.POH_HOUSE_LOCATION)
+		{
+			// so the ring menu names the house's town before the dials are first opened
+			repo.placeHouse(e.getValue());
+		}
 		if (open && (id == VarbitID.FAIRYRING_1 || id == VarbitID.FAIRYRING_2 || id == VarbitID.FAIRYRING_3))
 		{
 			// once the dials show the selection the filter has done its job

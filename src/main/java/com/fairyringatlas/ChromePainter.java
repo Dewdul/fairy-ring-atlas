@@ -238,7 +238,7 @@ public class ChromePainter
 				arrow(g, x, bar.y + bar.height / 2.0, 9, GREY);
 				x += 14;
 				boolean match = s.selected != null && s.selected.equals(code);
-				x = text(g, dialled == null ? "nothing" : dialled.getName(), ink.small,
+				x = text(g, dialled == null ? "nothing" : s.repo.displayName(dialled), ink.small,
 					dialled == null ? GREY : match ? GOOD : CREAM, x, ty, right);
 			}
 		}
@@ -455,7 +455,7 @@ public class ChromePainter
 					// a click opens the area and selects its first usable ring
 					Ring pick = s.repo.defaultRing(c.id);
 					s.hits.add(pick == null ? new Hit(Hit.Kind.CARD, clipTo(card, content), null, c.id, "Open", c.name)
-						: new Hit(Hit.Kind.CARD, clipTo(card, content), pick, c.id, "Select", pick.getCode() + " " + pick.getName()));
+						: new Hit(Hit.Kind.CARD, clipTo(card, content), pick, c.id, "Select", pick.getCode() + " " + s.repo.displayName(pick)));
 				}
 			}
 			for (int i = 0; i < c.rings.size(); i++)
@@ -465,7 +465,7 @@ public class ChromePainter
 				chip(g, s, r, chip);
 				if (house == null && content.intersects(chip))
 				{
-					s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(chip, content), r, null, "Select", r.getCode() + " " + r.getName()));
+					s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(chip, content), r, null, "Select", r.getCode() + " " + s.repo.displayName(r)));
 				}
 			}
 			g.setComposite(oldComp);
@@ -522,11 +522,11 @@ public class ChromePainter
 			Rectangle chip = new Rectangle(row.x + 3, row.y + 2, chipWidth(s, r), sh + 2);
 			chip(g, s, r, chip);
 			int tx = chip.x + chip.width + 5;
-			ink.text(g, ink.fit(r.getName(), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
+			ink.text(g, ink.fit(s.repo.displayName(r), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
 			g.setComposite(oldComp);
 			if (content.intersects(row))
 			{
-				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, Hit.FAVE, "Select", r.getCode() + " " + r.getName()));
+				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, Hit.FAVE, "Select", r.getCode() + " " + s.repo.displayName(r)));
 			}
 			y += row.height + 2;
 		}

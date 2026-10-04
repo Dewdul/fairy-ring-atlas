@@ -198,7 +198,7 @@ public class AtlasPainter
 			}
 			g.setComposite(old);
 			int hr = (int) Math.ceil(rad + 3);
-			String target = (r.getCode() == null ? "" : r.getCode() + " ") + r.getName();
+			String target = (r.getCode() == null ? "" : r.getCode() + " ") + s.repo.displayName(r);
 			s.hits.add(new Hit(Hit.Kind.MARKER, new Rectangle((int) sx - hr, (int) sy - hr, hr * 2, hr * 2), r, null,
 				r.isDialable() ? "Select" : "Zoom to", target));
 		}

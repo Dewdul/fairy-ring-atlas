@@ -1115,7 +1115,10 @@ default font when `FontManager` is unavailable).
   1 Rimmington (2953,3224), 2 Taverley, 3 Pollnivneach, 4 Rellekka, 5 Brimhaven, 6 Yanille,
   8 Hosidius, 9 Prifddinas, 13 Aldarin. It moves DIQ onto the surface layer at that portal.
   Prifddinas lies outside the bundled map, so it keeps the card only, named for the town. The
-  side panel's *Your house* card stays and selects DIQ and zooms to it.
+  side panel's *Your house* card stays and selects DIQ and zooms to it. The value is read at
+  every dial refresh, at start-up when logged in, and on its `VarbitChanged`, so the ring menu
+  names the town before the dials are first opened. Every label and menu target that names a
+  ring goes through `RingRepository.displayName`, which adds the town to DIQ's name.
 
 ### Free space in resizable mode (added 2026-10-03, at the user's request)
 
