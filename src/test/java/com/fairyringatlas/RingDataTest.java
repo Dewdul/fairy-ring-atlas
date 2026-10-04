@@ -362,6 +362,23 @@ public class RingDataTest
 	}
 
 	@Test
+	public void groupRowLabelsSearchLikeTheRingsWords()
+	{
+		RingRepository repo = real();
+		Ring cks = repo.ring("CKS");
+		// a row label's words count as the ring's words, from their start, only past three letters
+		assertFalse(cks.matches("towr"));
+		assertTrue(cks.matches("towr", "Towr Slayer"));
+		assertTrue(cks.matches("slay tow", "Slayer Tower"));
+		assertFalse(cks.matches("ower", "Slayer Tower"));
+		assertFalse(cks.matches("sla", "Slayer Tower"));
+		assertTrue(cks.matches("ck", "Slayer Tower"));
+		assertFalse(cks.matches("zanaris dung", "Slayer Tower"));
+		assertTrue(cks.matches("", "Slayer Tower"));
+		assertEquals(cks.matches("canifis"), cks.matches("canifis", null));
+	}
+
+	@Test
 	public void state()
 	{
 		RingRepository repo = RingRepository.load(new Gson(), FIXTURES);

@@ -18,23 +18,31 @@ import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import lombok.Value;
 
 /**
  * The map's chrome in an OSRS style: dark stone frame, the top bar with breadcrumb, dial readout
- * and buttons, the side panel (Favourites, then Elsewhere: the off-surface layers), the info card and the frames around the
- * holes left for the real Teleport and close buttons. Needs no game client.
+ * and buttons, the side panel (Favourites, then Elsewhere: the off-surface layers), the Groups panel on
+ * the right, the info card and the frames around the holes left for the real Teleport and close
+ * buttons. Needs no game client.
  */
 public class ChromePainter
 {
 	static final int BAR_H = 22;
 	private static final int BUTTON_H = 16;
 	static final int PANEL_W = 150;
+	/** Width of the open Groups panel on a roomy map; see {@link #groupsWidth}. */
+	static final int GROUPS_W = 190;
 	static final int CARD_W = 340;
 	/** Width of the default, compact card. */
 	static final int CARD_W_COMPACT = 280;
 	static final int CARD_MAX_H = 260;
 	/** Menu target of the panel's show/hide toggle. */
 	private static final String PANEL_NAME = "Favourites and Elsewhere";
+	private static final String GROUPS_NAME = "Groups";
+	/** Height of the closed Groups panel's tab, which has its name written down it. */
+	private static final int GROUPS_TAB_H = 66;
 
 	static final Color FRAME = new Color(0x1e1a14);
 	static final Color BRONZE = new Color(0x6b5a40);
@@ -79,6 +87,7 @@ public class ChromePainter
 		{
 			s.panel = new Rectangle(v.getX() + 6, top, PANEL_W, v.getY() + v.getH() - 6 - top);
 		}
+		s.groupsPanel = groupsRect(s, top);
 		Layer layer = s.repo.layer(v.getLayer());
 		s.backButton = null;
 		if (layer != null && !layer.isSurface())
@@ -115,7 +124,9 @@ public class ChromePainter
 			lg.translate(-v.getX(), -v.getY());
 			lg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 			int mark = s.hits.size();
+			drop = null;
 			paintPanel(lg, s);
+			paintGroups(lg, s);
 			paintTopBar(lg, s);
 			paintBackButton(lg, s);
 			paintCard(lg, s);
@@ -152,7 +163,7 @@ public class ChromePainter
 		boolean flash = s.now < s.flashUntil && (s.now / 250) % 2 == 0;
 		return java.util.Objects.hash(v.getX(), v.getY(), v.getW(), v.getH(), v.getLayer(), s.selected, s.hovered,
 			java.util.Arrays.hashCode(s.dials), s.query, s.rowVisible, s.notice, s.panelCollapsed, s.panelScroll,
-			s.faveOrder, s.dragFave, s.dragFave == null ? 0 : s.dragY,
+			s.faveOrder, s.dragList, s.dragCode, s.dragCode == null ? 0 : s.dragY, s.groupsOpen, s.groups, s.groupsScroll, s.hoveredNote, s.hoveredDetails,
 			s.now < s.flashUntil, flash, hover, s.holes, s.teleportSlot, s.repo.getStateHash(), s.here,
 			s.visitedColor, s.selectedColor, s.favouriteColor, s.fullDetails, focusCovered(s));
 	}
@@ -169,6 +180,7 @@ public class ChromePainter
 		layerHits.clear();
 		layerCard = null;
 		layerKey = 0;
+		drop = null;
 	}
 
 	// ------------------------------------------------------------------ top bar
@@ -504,19 +516,32 @@ public class ChromePainter
 			}
 			return y + 12;
 		}
+		return paintRows(g, s, faves, null, Hit.FAVE, content, y) + 8;
+	}
+
+	/**
+	 * Ring rows (code chip and name) of a list the player can reorder by dragging: the Favourites
+	 * or one group, whose rows show their labels (null: the ring names). Returns the y below them.
+	 */
+	private int paintRows(Graphics2D g, Scene s, List<Ring> rings, Map<String, String> labels, String list, Rectangle content, int y)
+	{
+		int sh = ink.height(ink.small);
+		int top = y;
 		Composite oldComp = g.getComposite();
 		List<Rectangle> others = new ArrayList<>();
+		List<Ring> otherRings = new ArrayList<>();
 		Ring dragged = null;
-		for (Ring r : faves)
+		for (Ring r : rings)
 		{
 			Rectangle row = new Rectangle(content.x, y, content.width, sh + 6);
-			boolean drag = r.getCode().equals(s.dragFave);
-			boolean hover = s.dragFave == null && s.mouse != null && row.contains(s.mouse) && content.contains(s.mouse);
-			if (drag || (s.searching() && !r.matches(s.query)))
+			boolean drag = s.dragging(list, r.getCode());
+			boolean hover = s.dragCode == null && s.mouse != null && row.contains(s.mouse) && content.contains(s.mouse);
+			String label = label(s, r, labels);
+			if (drag || (s.searching() && !rowMatches(s, r, labels)))
 			{
 				g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, drag ? 0.3f : 0.4f));
 			}
-			paintFaveRow(g, s, r, row, hover);
+			paintRow(g, s, r, label, row, hover);
 			g.setComposite(oldComp);
 			if (drag)
 			{
@@ -525,10 +550,11 @@ public class ChromePainter
 			else
 			{
 				others.add(row);
+				otherRings.add(r);
 			}
 			if (content.intersects(row))
 			{
-				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, Hit.FAVE, "Select", r.getCode() + " " + s.repo.displayName(r)));
+				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, list, "Select", r.getCode() + " " + label));
 			}
 			y += row.height + 2;
 		}
@@ -536,7 +562,8 @@ public class ChromePainter
 		{
 			// where the row would land, and the row itself under the pointer
 			int at = dropIndex(others, s.dragY);
-			int lineY = others.isEmpty() ? content.y : at < others.size() ? others.get(at).y - 2
+			drop = new Drop(list, dragged.getCode(), at < otherRings.size() ? otherRings.get(at).getCode() : null);
+			int lineY = others.isEmpty() ? top : at < others.size() ? others.get(at).y - 2
 				: others.get(others.size() - 1).y + others.get(others.size() - 1).height + 1;
 			g.setColor(TITLE);
 			g.fillRect(content.x + 2, lineY - 1, content.width - 4, 2);
@@ -545,13 +572,13 @@ public class ChromePainter
 			g.fillRoundRect(ghost.x + 2, ghost.y + 3, ghost.width, ghost.height, 6, 6);
 			g.setColor(FILL_LIGHT);
 			g.fillRoundRect(ghost.x, ghost.y, ghost.width, ghost.height, 6, 6);
-			paintFaveRow(g, s, dragged, ghost, true);
+			paintRow(g, s, dragged, label(s, dragged, labels), ghost, true);
 		}
-		return y + 8;
+		return y;
 	}
 
-	/** Where a dragged favourite lands among the other rows: before the first row below the pointer. */
-	static int dropIndex(List<Rectangle> rows, int y)
+	/** Where a dragged row lands among the other rows of its list: before the first row below the pointer. */
+	private static int dropIndex(List<Rectangle> rows, int y)
 	{
 		int at = 0;
 		for (Rectangle r : rows)
@@ -564,7 +591,23 @@ public class ChromePainter
 		return at;
 	}
 
-	private void paintFaveRow(Graphics2D g, Scene s, Ring r, Rectangle row, boolean hover)
+	/** A row's label: its group's label for the ring, else the ring's name (the house's with its town). */
+	private static String label(Scene s, Ring r, Map<String, String> labels)
+	{
+		String l = labels == null ? null : labels.get(r.getCode());
+		return l != null ? l : s.repo.displayName(r);
+	}
+
+	/**
+	 * Whether the search matches a row, by the travel log's rules ({@link Ring#matches}): up to
+	 * three letters match the code only; longer searches also count the words of the row's group label.
+	 */
+	private static boolean rowMatches(Scene s, Ring r, Map<String, String> labels)
+	{
+		return r.matches(s.query, labels == null ? null : labels.get(r.getCode()));
+	}
+
+	private void paintRow(Graphics2D g, Scene s, Ring r, String label, Rectangle row, boolean hover)
 	{
 		int sh = ink.height(ink.small);
 		boolean sel = r.getCode().equals(s.selected);
@@ -579,11 +622,205 @@ public class ChromePainter
 		Rectangle chip = new Rectangle(row.x + 3, row.y + 2, chipWidth(s, r), sh + 2);
 		chip(g, s, r, chip);
 		int tx = chip.x + chip.width + 5;
-		ink.text(g, ink.fit(s.repo.displayName(r), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
+		ink.text(g, ink.fit(label, ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
 	}
 
 	/** Largest useful panel scroll of the last paint, for the input handler to clamp to. */
 	volatile int panelScrollMax;
+	volatile int groupsScrollMax;
+
+	/**
+	 * Where the dragged row lands as last painted, so the drop is where the line showed (the
+	 * line counts every row of the list, the hits only the ones in view); null with no drag.
+	 */
+	volatile Drop drop;
+
+	/** A dragged row: its list and ring, and the ring it goes in front of (null: the end). */
+	@Value
+	static class Drop
+	{
+		String list;
+		String code;
+		String before;
+	}
+
+	// ------------------------------------------------------------------ Groups panel
+
+	/**
+	 * The open Groups panel's width on a map this wide: {@link #GROUPS_W}, so most row labels fit,
+	 * but at most 30% of the map (labels are cut short instead) and never narrower than the left panel.
+	 */
+	static int groupsWidth(int mapWidth)
+	{
+		return Math.max(PANEL_W, Math.min(GROUPS_W, mapWidth * 30 / 100));
+	}
+
+	/** The Groups panel against the map's right edge, stopping above Teleport and close; or its tab. */
+	private static Rectangle groupsRect(Scene s, int top)
+	{
+		MapView v = s.view;
+		int right = v.getX() + v.getW() - 6;
+		int w = groupsWidth(v.getW());
+		if (!s.groupsOpen)
+		{
+			return new Rectangle(right - 20, top, 20, GROUPS_TAB_H);
+		}
+		int bottom = v.getY() + v.getH() - 6;
+		for (Rectangle b : s.blockers())
+		{
+			// with room for the holes' frames and shadow
+			Rectangle gb = AtlasPainter.grow(b, 8);
+			if (gb.x < right && gb.x + gb.width > right - w && gb.y < bottom && gb.y + gb.height > top)
+			{
+				bottom = Math.min(bottom, gb.y);
+			}
+		}
+		return new Rectangle(right - w, top, w, Math.max(GROUPS_TAB_H, bottom - top));
+	}
+
+	/** A group's rings, in its order, leaving out codes the data does not know. */
+	private static List<Ring> rings(Scene s, RingGroups.Group group)
+	{
+		List<Ring> out = new ArrayList<>();
+		for (String code : group.getCodes())
+		{
+			Ring r = s.repo.ring(code);
+			if (r != null)
+			{
+				out.add(r);
+			}
+		}
+		return out;
+	}
+
+	private static boolean groupMatches(Scene s, RingGroups.Group group)
+	{
+		for (Ring r : rings(s, group))
+		{
+			if (rowMatches(s, r, group.getLabels()))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The Groups panel: a header per group (collapse triangle, name, count) over its ring rows.
+	 * Closed, it is a slim tab with its name written down it.
+	 */
+	private void paintGroups(Graphics2D g, Scene s)
+	{
+		Rectangle p = s.groupsPanel;
+		if (p == null)
+		{
+			return;
+		}
+		panelBox(g, p);
+		boolean matches = false;
+		for (RingGroups.Group gr : s.groups)
+		{
+			matches |= s.searching() && groupMatches(s, gr);
+		}
+		if (!s.groupsOpen)
+		{
+			groupsScrollMax = 0;
+			s.hits.add(new Hit(Hit.Kind.BUTTON, p, null, Hit.TOGGLE_GROUPS, "Show", GROUPS_NAME));
+			if (matches)
+			{
+				g.setColor(HINT);
+				g.setStroke(new BasicStroke(1.5f));
+				g.drawRoundRect(p.x, p.y, p.width - 1, p.height - 1, 8, 8);
+			}
+			triangle(g, p.x + p.width / 2.0, p.y + 12, 4, false, CREAM);
+			Graphics2D tg = (Graphics2D) g.create();
+			tg.translate(p.x + (p.width + ink.height(ink.small)) / 2, p.y + 22);
+			tg.rotate(Math.PI / 2);
+			ink.text(tg, GROUPS_NAME, ink.small, matches ? HINT : CREAM, 0, 0, Ink.Style.SHADOW);
+			tg.dispose();
+			return;
+		}
+		s.hits.add(new Hit(Hit.Kind.PANEL, p, null, null, null, null));
+		int sh = ink.height(ink.small);
+		Rectangle toggle = new Rectangle(p.x + 4, p.y + 3, 16, 15);
+		button(g, s, toggle, "", Hit.TOGGLE_GROUPS, "Hide", GROUPS_NAME);
+		triangle(g, toggle.x + 8, toggle.y + 7.5, 3.5, true, CREAM);
+		ink.text(g, GROUPS_NAME, ink.bold, TITLE, toggle.x + toggle.width + 5, p.y + 4, Ink.Style.SHADOW);
+		button(g, s, new Rectangle(p.x + p.width - 20, p.y + 3, 16, 15), "+", Hit.NEW_GROUP, "New group", "");
+
+		Rectangle content = new Rectangle(p.x + 4, p.y + 22, p.width - 8, p.height - 26);
+		Shape oldClip = g.getClip();
+		g.clip(content);
+		Composite oldComp = g.getComposite();
+		int y = content.y - s.groupsScroll;
+		if (s.groups.isEmpty())
+		{
+			for (String t : ink.wrap("Click + for a new group, or right-click a ring: Add to group.", ink.small, content.width - 8))
+			{
+				ink.text(g, t, ink.small, GREY, content.x + 4, y + 2, Ink.Style.SHADOW);
+				y += sh;
+			}
+		}
+		for (RingGroups.Group gr : s.groups)
+		{
+			List<Ring> rings = rings(s, gr);
+			Rectangle head = new Rectangle(content.x, y, content.width, sh + 6);
+			boolean hover = s.dragCode == null && s.mouse != null && head.contains(s.mouse) && content.contains(s.mouse);
+			if (s.searching() && !groupMatches(s, gr))
+			{
+				g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
+			}
+			g.setColor(hover ? new Color(0x5a4b36) : FILL_LIGHT);
+			g.fillRoundRect(head.x, head.y, head.width, head.height, 6, 6);
+			g.setColor(hover ? BRONZE_LIGHT : BRONZE);
+			g.setStroke(new BasicStroke(1f));
+			g.drawRoundRect(head.x, head.y, head.width - 1, head.height - 1, 6, 6);
+			double cy = head.y + head.height / 2.0;
+			if (gr.isCollapsed())
+			{
+				triangle(g, head.x + 8, cy, 3.5, true, CREAM);
+			}
+			else
+			{
+				chevron(g, head.x + 8, cy, 1);
+			}
+			String count = String.valueOf(rings.size());
+			int cw = ink.width(ink.small, count);
+			ink.text(g, count, ink.small, GREY, head.x + head.width - 5 - cw, head.y + 3, Ink.Style.SHADOW);
+			ink.text(g, ink.fit(gr.getName(), ink.small, head.width - 25 - cw), ink.small, TITLE, head.x + 15, head.y + 3, Ink.Style.SHADOW);
+			g.setComposite(oldComp);
+			if (content.intersects(head))
+			{
+				s.hits.add(new Hit(Hit.Kind.GROUP, clipTo(head, content), null, gr.getId(), gr.isCollapsed() ? "Expand" : "Collapse", gr.getName()));
+			}
+			y += head.height + 2;
+			if (gr.isCollapsed())
+			{
+				y += 3;
+				continue;
+			}
+			if (rings.isEmpty())
+			{
+				for (String t : ink.wrap("Right-click a ring: Add to group.", ink.small, content.width - 8))
+				{
+					ink.text(g, t, ink.small, GREY, content.x + 4, y + 1, Ink.Style.SHADOW);
+					y += sh;
+				}
+			}
+			y = paintRows(g, s, rings, gr.getLabels(), Hit.groupRow(gr.getId()), content, y) + 6;
+		}
+		g.setClip(oldClip);
+		int overflow = y + s.groupsScroll - (content.y + content.height);
+		if (s.groupsScroll > 0)
+		{
+			chevron(g, p.x + p.width / 2.0, content.y + 3, -1);
+		}
+		if (overflow > s.groupsScroll)
+		{
+			chevron(g, p.x + p.width / 2.0, content.y + content.height - 3, 1);
+		}
+		groupsScrollMax = Math.max(0, overflow);
+	}
 
 	/** A code chip is the code, plus a padlock in front when the ring is not unlocked yet. */
 	private int chipWidth(Scene s, Ring r)
@@ -658,8 +895,10 @@ public class ChromePainter
 		Ring ring = s.hovered != null ? s.hovered : s.repo.ring(s.selected);
 		MapView v = s.view;
 		int left = s.panel != null ? s.panel.x + s.panel.width + 6 : v.getX() + 6;
+		// an open Groups panel takes the right side; the closed tab is only kept clear of
+		int right = s.groupsOpen && s.groupsPanel != null ? s.groupsPanel.x - 6 : v.getX() + v.getW() - 6;
 		int maxW = Math.min(Math.min(s.fullDetails ? CARD_W : CARD_W_COMPACT, Math.max(220, v.getW() * 45 / 100)),
-			v.getX() + v.getW() - 6 - left);
+			right - left);
 		// on a small (fixed mode) map the card keeps to under half the height so the map stays usable
 		int maxH = Math.min(CARD_MAX_H, v.getH() * (v.getH() < 450 ? 48 : 62) / 100);
 		java.awt.Point focus = cardFocus(s);
@@ -669,7 +908,7 @@ public class ChromePainter
 			int lh = ink.height(ink.small);
 			int w = Math.max(ink.width(ink.small, hint), 22 + ink.width(ink.small, "Unlocked") + 26 + ink.width(ink.small, "Locked")) + 12;
 			int hh = lh * 2 + 12;
-			Rectangle r = place(s, left, w, hh, hh, null);
+			Rectangle r = place(s, left, right, w, hh, hh, null);
 			// like the card, the hint keeps labels from under it and absorbs presses
 			s.card = r;
 			if (r != null)
@@ -762,6 +1001,27 @@ public class ChromePainter
 				{
 					lines.add(new Line(ink.fit(tip, ink.small, textW), ink.small, HINT, 0));
 				}
+			}
+		}
+		if (ring == s.hovered && (s.hoveredNote != null || s.hoveredDetails != null))
+		{
+			// hovered in a group: why the group has it, then what is there (patches, monsters) in at most
+			// two lines; the compact card shows only what is there when it has both, so it grows by a line
+			// at most
+			if (s.hoveredNote != null && (full || s.hoveredDetails == null))
+			{
+				if (full)
+				{
+					addWrapped(lines, s.hoveredNote, ink.small, HINT, textW, 0);
+				}
+				else
+				{
+					lines.add(new Line(ink.fit(s.hoveredNote, ink.small, textW), ink.small, HINT, 0));
+				}
+			}
+			if (s.hoveredDetails != null)
+			{
+				addWrapped(lines, s.hoveredDetails, ink.small, HINT, textW, 0, 2);
 			}
 		}
 		if (full)
@@ -878,7 +1138,7 @@ public class ChromePainter
 			String more = last.text.endsWith(".") ? last.text.substring(0, last.text.length() - 1) : last.text;
 			lines.set(cut - 1, new Line(ink.fit(more + " ...", last.font, textW).replace(" ...", "..."), last.font, last.color, last.gapBefore));
 		}
-		Rectangle card = place(s, left, maxW, h, Math.min(h, 120), focus);
+		Rectangle card = place(s, left, right, maxW, h, Math.min(h, 120), focus);
 		if (card == null)
 		{
 			s.card = null;
@@ -929,11 +1189,21 @@ public class ChromePainter
 
 	private void addWrapped(List<Line> lines, String text, Font f, Color c, int w, int gap)
 	{
-		boolean first = true;
-		for (String t : ink.wrap(text, f, w))
+		addWrapped(lines, text, f, c, w, gap, Integer.MAX_VALUE);
+	}
+
+	/** Wrapped to at most max lines; the last one ends in "..." when there is more. */
+	private void addWrapped(List<Line> lines, String text, Font f, Color c, int w, int gap, int max)
+	{
+		List<String> wrapped = ink.wrap(text, f, w);
+		for (int i = 0; i < Math.min(max, wrapped.size()); i++)
 		{
-			lines.add(new Line(t, f, c, first ? gap : 0));
-			first = false;
+			String t = wrapped.get(i);
+			if (i == max - 1 && wrapped.size() > max)
+			{
+				t = ink.fit(t + " " + String.join(" ", wrapped.subList(max, wrapped.size())), f, w);
+			}
+			lines.add(new Line(t, f, c, i == 0 ? gap : 0));
 		}
 	}
 
@@ -991,12 +1261,11 @@ public class ChromePainter
 	 * top-left, clear of the holes and of the ring it describes. Failing that, it slides a corner
 	 * spot off the holes, shrinking to at least minH.
 	 */
-	private Rectangle place(Scene s, int left, int w, int h, int minH, java.awt.Point focus)
+	private Rectangle place(Scene s, int left, int right, int w, int h, int minH, java.awt.Point focus)
 	{
 		MapView v = s.view;
 		int top = v.getY() + BAR_H + (s.notice != null ? 18 : 0) + 6;
 		int bottom = v.getY() + v.getH() - 6;
-		int right = v.getX() + v.getW() - 6;
 		if (w <= 40)
 		{
 			return null;
@@ -1064,6 +1333,10 @@ public class ChromePainter
 			{
 				return false;
 			}
+		}
+		if (s.groupsPanel != null && AtlasPainter.grow(s.groupsPanel, 4).intersects(r))
+		{
+			return false;
 		}
 		return focus == null || !AtlasPainter.grow(r, 12).contains(focus);
 	}

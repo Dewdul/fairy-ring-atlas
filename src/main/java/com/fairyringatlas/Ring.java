@@ -148,6 +148,15 @@ public class Ring
 	 */
 	public boolean matches(String query)
 	{
+		return matches(query, null);
+	}
+
+	/**
+	 * {@link #matches(String)} for a row that shows the ring under its own label (a group's row):
+	 * the label's words count as the ring's words. Up to three letters still match the code only.
+	 */
+	public boolean matches(String query, String label)
+	{
 		if (query == null || query.trim().isEmpty())
 		{
 			return true;
@@ -174,9 +183,11 @@ public class Ring
 			}
 			words = w;
 		}
+		List<String> labelWords = new ArrayList<>();
+		addWords(labelWords, label);
 		for (String part : WORD_BREAK.split(q))
 		{
-			if (!part.isEmpty() && !startsAWord(words, part))
+			if (!part.isEmpty() && !startsAWord(words, part) && !startsAWord(labelWords, part))
 			{
 				return false;
 			}

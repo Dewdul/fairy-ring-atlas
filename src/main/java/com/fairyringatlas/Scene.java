@@ -53,10 +53,19 @@ public final class Scene
 	public boolean panelCollapsed;
 	/** The player's own order for the Favourites list (codes); may be empty. */
 	public List<String> faveOrder = new ArrayList<>();
-	/** The favourite being dragged to a new place in the list, or null; and the pointer's y. */
-	public String dragFave;
+	/** The row being dragged to a new place in its list (Hit.FAVE or a group row id), or null; and the pointer's y. */
+	public String dragList;
+	public String dragCode;
 	public int dragY;
 	public int panelScroll;
+	/** The Groups panel on the right: open or a slim tab, its groups and its scroll. */
+	public boolean groupsOpen;
+	public List<RingGroups.Group> groups = new ArrayList<>();
+	public int groupsScroll;
+	/** A hint for the hovered ring from the group row it is hovered in (a prebuilt group's note), or null. */
+	public String hoveredNote;
+	/** What is at the hovered ring's spot, from the same group row (its patches or slayer monsters), or null. */
+	public String hoveredDetails;
 	public double clueX = Double.NaN;
 	public double clueY = Double.NaN;
 	public Point mouse;
@@ -79,6 +88,8 @@ public final class Scene
 	public final List<Hit> hits = new ArrayList<>();
 	public Rectangle card;
 	public Rectangle panel;
+	/** The Groups panel, or its tab while it is closed. */
+	public Rectangle groupsPanel;
 	public Rectangle topBar;
 	/** The large "Back to Gielinor" button on off-surface maps; null on the surface. */
 	public Rectangle backButton;
@@ -93,6 +104,12 @@ public final class Scene
 		List<Rectangle> out = new ArrayList<>(holes);
 		out.add(teleportSlot);
 		return out;
+	}
+
+	/** Whether this code's row in this list is the one being dragged. */
+	public boolean dragging(String list, String code)
+	{
+		return dragCode != null && dragCode.equals(code) && dragList != null && dragList.equals(list);
 	}
 
 	public boolean searching()

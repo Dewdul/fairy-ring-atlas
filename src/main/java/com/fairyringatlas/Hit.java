@@ -20,7 +20,7 @@ public class Hit
 	{
 		/** A ring marker; ring is set. */
 		MARKER,
-		/** A ring chip in an Elsewhere card, or a Favourites row (id FAVE); ring is set. */
+		/** A ring chip in an Elsewhere card, a Favourites row (id FAVE) or a group's row (id {@link #groupRow}); ring is set. */
 		CHIP,
 		/** An Elsewhere card; id is the layer id; ring is the ring a click selects, if any. */
 		CARD,
@@ -32,6 +32,8 @@ public class Hit
 		BLOCK,
 		/** The Elsewhere panel background: like BLOCK, but the wheel scrolls it. */
 		PANEL,
+		/** A group's header in the Groups panel; id is the group id. */
+		GROUP,
 	}
 
 	public static final String ZOOM_IN = "zoomIn";
@@ -46,6 +48,9 @@ public class Hit
 	public static final String FAVE = "fave";
 	/** Id of the house card in the side panel (a CHIP hit). */
 	public static final String HOUSE = "house";
+	public static final String TOGGLE_GROUPS = "groups";
+	public static final String NEW_GROUP = "newGroup";
+	private static final String GROUP_ROW = "group:";
 
 	Kind kind;
 	Rectangle area;
@@ -58,6 +63,24 @@ public class Hit
 	public boolean isActionable()
 	{
 		return kind != Kind.BLOCK && kind != Kind.PANEL;
+	}
+
+	/** Id of a ring row in a group of the Groups panel. */
+	public static String groupRow(String groupId)
+	{
+		return GROUP_ROW + groupId;
+	}
+
+	/** The group of a group-row id, or null for any other id. */
+	public static String groupOf(String id)
+	{
+		return id != null && id.startsWith(GROUP_ROW) ? id.substring(GROUP_ROW.length()) : null;
+	}
+
+	/** Whether a row can be dragged to reorder its list: a favourite or a group's ring. */
+	public boolean isDraggableRow()
+	{
+		return kind == Kind.CHIP && ring != null && (FAVE.equals(id) || groupOf(id) != null);
 	}
 
 	/** The topmost hit containing the point, or null. */

@@ -44,8 +44,8 @@ final class FavouriteOrder
 		return out;
 	}
 
-	/** The codes of the shown list after moving one of them to the given position. */
-	static List<String> move(List<Ring> shown, String code, int index)
+	/** The codes of the shown list after moving one of them to just before another (null, or one not there: to the end). */
+	static List<String> move(List<Ring> shown, String code, String before)
 	{
 		List<String> codes = new ArrayList<>(shown.size());
 		for (Ring r : shown)
@@ -56,7 +56,8 @@ final class FavouriteOrder
 		{
 			return codes;
 		}
-		codes.add(Math.max(0, Math.min(index, codes.size())), code);
+		int at = codes.indexOf(before);
+		codes.add(at < 0 ? codes.size() : at, code);
 		return codes;
 	}
 

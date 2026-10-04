@@ -30,6 +30,9 @@ import javax.imageio.ImageIO;
 public class MapPreview
 {
 	private static final String BASE = FairyRingAtlasPlugin.RESOURCES;
+	/** The prebuilt groups, and whether the next render shows the Groups panel open. */
+	private static RingGroups groups;
+	private static boolean groupsOpen;
 
 	public static void main(String[] args) throws IOException
 	{
@@ -68,8 +71,9 @@ public class MapPreview
 		Rectangle big = new Rectangle(30, 30, 1100, 720);
 		Rectangle fixed = new Rectangle(30, 30, 512, 334);
 
-		java.awt.Insets wide = FairyRingAtlasPlugin.chromeInsets(false, false);
-		java.awt.Insets narrow = FairyRingAtlasPlugin.chromeInsets(true, false);
+		java.awt.Insets wide = FairyRingAtlasPlugin.chromeInsets(big.width, false, false, false);
+		java.awt.Insets narrow = FairyRingAtlasPlugin.chromeInsets(fixed.width, true, false, false);
+		groups = RingGroups.parse(new Gson(), RingGroups.defaults(RingRepository.read(new Gson(), BASE + "groups.json", RingGroups.DefFile.class)), null);
 		MapView fit = FairyRingAtlasPlugin.fitRings(MapView.of(surface, big), repo.ringsIn(Layer.SURFACE), 0, wide);
 		render(repo, painter, out, "1-fit", fit, "AIQ", null, new int[]{0, 1, 2}, false);
 		render(repo, painter, out, "2-lumbridge-4ppt", MapView.of(surface, big).focusOn(3222.5, 3218.5, 4, wide), "CLP", "DIS", new int[]{3, 2, 2}, false);
@@ -86,8 +90,16 @@ public class MapPreview
 		Rectangle free = new Rectangle(30, 30, 1738, 905);
 		render(repo, painter, out, "8-free-space", FairyRingAtlasPlugin.fitRings(MapView.of(surface, free), repo.ringsIn(Layer.SURFACE), 0, wide),
 			"CKS", "AIQ", new int[]{0, 1, 2}, false);
+		// the Groups panel open on the right with both prebuilt groups, a Slayer row hovered (its note and
+		// details on the card; on the narrow map the longest details)
+		groupsOpen = true;
+		render(repo, painter, out, "9-groups", FairyRingAtlasPlugin.fitRings(MapView.of(surface, free), repo.ringsIn(Layer.SURFACE), 0,
+			FairyRingAtlasPlugin.chromeInsets(free.width, false, true, false)), "CIR", "AJR", new int[]{0, 1, 2}, false);
+		render(repo, painter, out, "10-groups-fixed", FairyRingAtlasPlugin.fitRings(MapView.of(surface, fixed), repo.ringsIn(Layer.SURFACE), 0,
+			FairyRingAtlasPlugin.chromeInsets(fixed.width, true, true, false)), "CKS", "DKR", new int[]{1, 3, 0}, true);
+		groupsOpen = false;
 		// a locked ring: needs something first, a first visit unlocks it, a need that cannot be checked
-		String[][] locked = {{"9-locked-needs", "AKP"}, {"10-locked-visit", "CJQ"}, {"11-locked-hint", "CLR"}};
+		String[][] locked = {{"11-locked-needs", "AKP"}, {"12-locked-visit", "CJQ"}, {"13-locked-hint", "CLR"}};
 		for (String[] l : locked)
 		{
 			Ring r = repo.ring(l[1]);
@@ -219,6 +231,15 @@ public class MapPreview
 		s.teleportSlot = confirm;
 		s.now = 400;
 		s.panelCollapsed = fixedMode;
+		s.groups = groups.view();
+		s.groupsOpen = groupsOpen;
+		if (groupsOpen && s.hovered != null && !s.groups.isEmpty())
+		{
+			// as when hovered in the first group's row
+			String note = groups.note(s.groups.get(0).getId(), hovered);
+			s.hoveredNote = note == null ? null : s.groups.get(0).getName() + ": " + note;
+			s.hoveredDetails = groups.details(s.groups.get(0).getId(), hovered);
+		}
 		s.clueX = 3110;
 		s.clueY = 3165;
 		s.rowVisible = true;
@@ -320,6 +341,6 @@ public class MapPreview
 	static List<String> names()
 	{
 		return Arrays.asList("1-fit", "2-lumbridge-4ppt", "3-16ppt", "4-zanaris", "5-fixed-fit", "6-kandarin-1ppt", "7-checks",
-			"9-locked-needs", "10-locked-visit", "11-locked-hint");
+			"8-free-space", "9-groups", "10-groups-fixed", "11-locked-needs", "12-locked-visit", "13-locked-hint");
 	}
 }

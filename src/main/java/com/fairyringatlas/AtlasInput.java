@@ -15,8 +15,10 @@ import net.runelite.client.input.MouseWheelListener;
 
 /**
  * Mouse input over the map, on the AWT thread. It touches only the plugin's volatile and
- * synchronised view state. Wheel zooms; a left press on empty map pans; a left press on a marker
- * or portal is held until release, so a click selects it but a drag starting on it pans; a left
+ * synchronised view state. Wheel zooms (or scrolls a panel); a left press on empty map pans; a left
+ * press on a Favourites or group row is held until release, so a click selects it but a drag moves
+ * it in its list; a left press on a marker or portal is held the same way, so a click selects it
+ * but a drag starting on it pans (both use {@link #CLICK_SLOP}); a left
  * press on a card or button is let through so the game runs our RUNELITE menu entry (swallowed
  * instead when the game's menu was still built for something else, so no stale game entry runs);
  * right presses always go through to open the menu we built. Nothing is consumed inside the holes, while a menu
@@ -35,9 +37,13 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	/** The marker or portal under the press: clicked on release unless the press became a drag. */
 	private volatile Hit pending;
 	private volatile boolean moved;
-	/** The favourite row the press landed on (a click selects it, a drag reorders the list). */
-	private volatile String faveCode;
-	private volatile boolean faveDragging;
+	/**
+	 * The row the press landed on in a list the player can reorder (Favourites or a group), and
+	 * its ring: a click selects it, a drag moves it.
+	 */
+	private volatile String rowList;
+	private volatile String rowCode;
+	private volatile boolean rowDragging;
 	private int pressX;
 	private int pressY;
 	private int lastX;
@@ -58,7 +64,11 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
 		double rotation = e.getPreciseWheelRotation();
-		if (hit != null && (hit.getKind() == Hit.Kind.PANEL || hit.getKind() == Hit.Kind.CARD
+		if (plugin.isGroupsOpen() && plugin.inGroups(e.getX(), e.getY()))
+		{
+			plugin.scrollGroups((int) Math.round(rotation * 24));
+		}
+		else if (hit != null && (hit.getKind() == Hit.Kind.PANEL || hit.getKind() == Hit.Kind.CARD
 			|| (hit.getKind() == Hit.Kind.CHIP && plugin.inPanel(e.getX(), e.getY()))))
 		{
 			plugin.scrollPanel((int) Math.round(rotation * 24));
@@ -81,11 +91,12 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 			return e;
 		}
 		Hit hit = plugin.hitAt(e.getX(), e.getY());
-		if (hit != null && hit.getKind() == Hit.Kind.CHIP && Hit.FAVE.equals(hit.getId()) && hit.getRing() != null)
+		if (hit != null && hit.isDraggableRow())
 		{
-			// a favourite row: click or drag is only known on release, so the press stays with us
-			faveCode = hit.getRing().getCode();
-			faveDragging = false;
+			// a favourite's or a group's row: click or drag is only known on release, so the press stays with us
+			rowList = hit.getId();
+			rowCode = hit.getRing().getCode();
+			rowDragging = false;
 			pressX = e.getX();
 			pressY = e.getY();
 			swallow = true;
@@ -125,16 +136,16 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseDragged(MouseEvent e)
 	{
-		String code = faveCode;
+		String code = rowCode;
 		if (code != null)
 		{
-			if (!faveDragging && Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) > CLICK_SLOP)
+			if (!rowDragging && Math.abs(e.getX() - pressX) + Math.abs(e.getY() - pressY) > CLICK_SLOP)
 			{
-				faveDragging = true;
+				rowDragging = true;
 			}
-			if (faveDragging)
+			if (rowDragging)
 			{
-				plugin.faveDrag(code, e.getY());
+				plugin.rowDrag(rowList, code, e.getY());
 			}
 			// not consumed, as for a pan
 			return e;
@@ -162,19 +173,19 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 	@Override
 	public MouseEvent mouseReleased(MouseEvent e)
 	{
-		String code = faveCode;
+		String code = rowCode;
 		if (code != null)
 		{
-			faveCode = null;
-			if (faveDragging)
+			rowCode = null;
+			if (rowDragging)
 			{
-				plugin.faveDrop(code, e.getY());
+				plugin.rowDrop(rowList, code);
 			}
 			else
 			{
-				plugin.faveClick(code);
+				plugin.rowClick(code);
 			}
-			faveDragging = false;
+			rowDragging = false;
 		}
 		Hit hit = pending;
 		if (hit != null)
@@ -210,7 +221,7 @@ public class AtlasInput extends MouseAdapter implements MouseWheelListener
 		swallow = false;
 		pending = null;
 		moved = false;
-		faveCode = null;
-		faveDragging = false;
+		rowCode = null;
+		rowDragging = false;
 	}
 }

@@ -186,7 +186,7 @@ public class RingRepository
 		return new RingRepository(base, file, index);
 	}
 
-	private static <T> T read(Gson gson, String path, Class<T> type)
+	static <T> T read(Gson gson, String path, Class<T> type)
 	{
 		try (InputStream in = RingRepository.class.getResourceAsStream(path))
 		{
