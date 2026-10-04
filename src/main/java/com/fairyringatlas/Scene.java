@@ -134,6 +134,16 @@ public final class Scene
 	 * The two lines the covered Teleport's stand-in shows: where it would go, and what sets the
 	 * dials. A map click only selects (hard rule 2), so this is how the button answers it.
 	 */
+	/**
+	 * Whether the selected ring must be dialled by hand: it is locked (not in the travel log, so
+	 * there is no row to click) and the dials do not show it yet.
+	 */
+	public boolean needsDialing()
+	{
+		Ring r = repo == null ? null : repo.ring(selected);
+		return r != null && r.isDialable() && !repo.hasLogRow(r.getCode()) && !dialsMatch(r.getCode());
+	}
+
 	public String[] teleportStandIn()
 	{
 		Ring r = repo == null ? null : repo.ring(selected);

@@ -19,7 +19,7 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 1. Use a fairy ring. The map opens over the dials, centred on the ring you are standing at. In resizable mode it fills the free space above the chatbox and left of the side panel, up to the Max width and height, and is centred in that space beyond them. The real **Teleport** and close buttons sit in the map's bottom-right corner. Teleport is greyed out until the dials show your chosen ring, so you can't teleport somewhere else by mistake.
 2. **Click a ring** to select it. The greyed-out Teleport now reads *Teleport to* its code, and it and the card tell you the next step:
    - **The ring is in your travel log.** The log is narrowed to that code and its row is highlighted. Click the row (*Use code*), then click **Teleport**. If you click a row in the log yourself, the map follows and the log is left as it is.
-   - **The ring is not in your travel log yet.** Click **Show dials**. Arrows on the real dials show which way to turn each one and how many times. Turn the dials, then click **Teleport**. The **Map** button takes you back to the map.
+   - **The ring is not in your travel log yet** (locked). The Teleport spot turns into an orange **Dial it by hand** button: click it (or **Show dials** on the card). Arrows on the real dials show which way to turn each one and how many times. Turn the dials, then click **Teleport**. The **Map** button takes you back to the map.
    - **The dials already show the code.** The card reads *Ready: click Teleport* and the Teleport button pulses.
 3. To navigate:
    - **Mouse wheel:** zoom.

@@ -819,7 +819,7 @@ public class ChromePainter
 			}
 			else
 			{
-				step = new Line("Locked: a first visit unlocks it. Dial it by hand:", ink.small, HINT, 6);
+				step = new Line("Locked: dial it by hand (orange button), then Teleport:", ink.small, HINT, 6);
 				dialRow = s.dials != null;
 			}
 		}
@@ -1054,6 +1054,27 @@ public class ChromePainter
 		g.setColor(new Color(0, 0, 0, 90));
 		g.fillRect(slot.x - 2, slot.y + slot.height + 2, slot.width + 5, 3);
 		g.fillRect(slot.x + slot.width + 2, slot.y - 1, 3, slot.height + 3);
+		if (s.needsDialing())
+		{
+			// a locked ring has no travel log row: the next step is the dials, and this says so
+			// where the eye goes for the next click; it is a button that shows them
+			Ring r = s.repo.ring(s.selected);
+			boolean hover = s.mouse != null && slot.contains(s.mouse);
+			g.setColor(FRAME);
+			g.fillRoundRect(slot.x - 1, slot.y - 1, slot.width + 2, slot.height + 2, 8, 8);
+			g.setColor(hover ? new Color(0xFFB04A) : new Color(0xE0841A));
+			g.fillRoundRect(slot.x, slot.y, slot.width, slot.height, 7, 7);
+			g.setColor(hover ? Color.WHITE : new Color(0xFFD08A));
+			g.drawRoundRect(slot.x, slot.y, slot.width - 1, slot.height - 1, 7, 7);
+			String title = ink.fit("Dial " + r.getCode() + " by hand", ink.bold, slot.width - 8);
+			String why = ink.fit("Click to show the dials", ink.small, slot.width - 8);
+			int y = slot.y + (slot.height - ink.height(ink.bold) - ink.height(ink.small)) / 2;
+			ink.text(g, title, ink.bold, Ink.DARK, slot.x + (slot.width - ink.width(ink.bold, title)) / 2, y, Ink.Style.PLAIN);
+			ink.text(g, why, ink.small, Ink.DARK, slot.x + (slot.width - ink.width(ink.small, why)) / 2,
+				y + ink.height(ink.bold), Ink.Style.PLAIN);
+			s.hits.add(new Hit(Hit.Kind.BUTTON, AtlasPainter.grow(slot, 3), null, Hit.DIALS, "Show", "dials"));
+			return;
+		}
 		g.setColor(new Color(0x2a241b));
 		g.fillRect(slot.x, slot.y, slot.width, slot.height);
 		g.setColor(FRAME);
@@ -1119,6 +1140,17 @@ public class ChromePainter
 				g.setStroke(new BasicStroke(1f));
 				g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 			}
+		}
+		Rectangle slot = s.teleportSlot;
+		if (slot != null && !s.holes.contains(slot) && s.needsDialing())
+		{
+			double t = 0.5 + 0.5 * Math.sin(s.now / 160.0);
+			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			g.setColor(AtlasPainter.withAlpha(TITLE, (int) (110 + 145 * t)));
+			g.setStroke(new BasicStroke(2.5f));
+			g.drawRoundRect(slot.x - 6, slot.y - 6, slot.width + 11, slot.height + 11, 8, 8);
+			g.setStroke(new BasicStroke(1f));
+			g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 		}
 	}
 
