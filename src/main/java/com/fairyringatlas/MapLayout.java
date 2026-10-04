@@ -30,6 +30,9 @@ public final class MapLayout
 		InterfaceID.FairyringsLog.UNIVERSE,
 	};
 
+	/** Room above the map for the game's mouse-over text in the canvas's top-left corner. */
+	static final int TOP_MARGIN = 24;
+
 	private MapLayout()
 	{
 	}
@@ -99,7 +102,8 @@ public final class MapLayout
 		int dialBottom = dial.y + dial.height;
 		// the inset canvas, grown to hold the dials when they sit closer than the inset to an edge
 		int left = Math.min(canvas.x + 6, dial.x);
-		int top = Math.min(canvas.y + 6, dial.y);
+		// the top keeps clear of the game's mouse-over text ("Cancel", "Walk here") at the top-left
+		int top = Math.min(canvas.y + TOP_MARGIN, dial.y);
 		int right = Math.max(canvas.x + canvas.width - 6, dialRight);
 		int bottom = Math.max(canvas.y + canvas.height - 6, dialBottom);
 		for (Rectangle o : obstacles)
