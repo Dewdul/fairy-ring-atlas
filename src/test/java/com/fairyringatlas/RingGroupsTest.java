@@ -227,6 +227,83 @@ public class RingGroupsTest
 	}
 
 	@Test
+	public void prebuiltRowsShowTheirBundledLabels()
+	{
+		RingGroups.Group s = group(fresh(), "slayer");
+		assertEquals("Slayer cave", s.getLabels().get("AJR"));
+		// cleaned like a name
+		assertEquals("Kalphite Lair", s.getLabels().get("CKS"));
+		// none bundled: the row shows the ring's name
+		assertNull(s.getLabels().get("DKS"));
+		assertTrue(s.getRenamed().isEmpty());
+		assertEquals("Farming Guild", group(fresh(), "farming").getLabels().get("CIR"));
+	}
+
+	@Test
+	public void renameAPrebuiltRowAndResetIt()
+	{
+		RingGroups g = fresh();
+		assertTrue(g.renameRow("slayer", "AJR", "  Kurasks <col> ", "Fremennik Slayer Dungeon"));
+		assertFalse(g.renameRow("slayer", "AJR", "Kurasks col", "Fremennik Slayer Dungeon"));
+		// not in the group, or nothing left of the name
+		assertFalse(g.renameRow("slayer", "CIR", "Konar", "Mount Karuulm"));
+		assertFalse(g.renameRow("slayer", "CKS", " <> ", "Canifis"));
+		g = roundTrip(g);
+		RingGroups.Group s = group(g, "slayer");
+		assertEquals("Kurasks col", s.getLabels().get("AJR"));
+		assertEquals(Collections.singleton("AJR"), s.getRenamed());
+		assertTrue(s.isModified());
+		// only the difference is saved: the other rows still follow the bundled labels
+		assertFalse(g.format(GSON).contains("Kalphite"));
+		assertTrue(g.resetRow("slayer", "AJR"));
+		assertFalse(g.resetRow("slayer", "AJR"));
+		s = group(g, "slayer");
+		assertEquals("Slayer cave", s.getLabels().get("AJR"));
+		assertFalse(s.isModified());
+		// a name typed as bundled is the default again, as is Reset to default
+		g.renameRow("slayer", "CKS", "Kalphite Lair", "Canifis");
+		assertFalse(group(g, "slayer").isModified());
+		g.renameRow("slayer", "DKS", "Brine rats", "Mudskipper Point");
+		g.renameRow("slayer", "AJR", "Kurasks", "Fremennik Slayer Dungeon");
+		assertTrue(g.reset("slayer"));
+		assertTrue(group(g, "slayer").getRenamed().isEmpty());
+		assertNull(group(g, "slayer").getLabels().get("DKS"));
+	}
+
+	@Test
+	public void ownRowsStartWithTheRingName()
+	{
+		RingGroups g = fresh();
+		String id = g.create("Bossing", "AKQ");
+		assertTrue(group(g, id).getLabels().isEmpty());
+		assertTrue(g.renameRow(id, "AKQ", "Kraken", "Kraken Cove"));
+		g = roundTrip(g);
+		assertEquals("Kraken", group(g, id).getLabels().get("AKQ"));
+		// typed back to the ring's name: nothing to reset
+		assertTrue(g.renameRow(id, "AKQ", "Kraken Cove", "Kraken Cove"));
+		assertTrue(group(g, id).getRenamed().isEmpty());
+		assertFalse(g.format(GSON).contains("labels"));
+	}
+
+	@Test
+	public void aRemovedRowForgetsItsName()
+	{
+		RingGroups g = fresh();
+		g.renameRow("slayer", "DKS", "Brine rats", "Mudskipper Point");
+		g.move("slayer", "DKS", "AJR");
+		assertEquals("Brine rats", group(g, "slayer").getLabels().get("DKS"));
+		assertTrue(g.remove("slayer", "DKS"));
+		assertTrue(g.add("slayer", "DKS"));
+		assertNull(group(roundTrip(g), "slayer").getLabels().get("DKS"));
+		// saved names for codes no longer in the group, or not codes at all, are dropped on load
+		String saved = "{\"groups\":[{\"id\":\"slayer\",\"labels\":{\"cks\":\"Kalphites!\",\"CIR\":\"Konar\",\"bad\":\"x\",\"AJR\":\"Slayer cave\"}}],"
+			+ "\"seen\":[\"slayer\",\"farming\"]}";
+		RingGroups.Group s = group(RingGroups.parse(GSON, defaults(), saved), "slayer");
+		assertEquals(Collections.singleton("CKS"), s.getRenamed());
+		assertEquals("Kalphites!", s.getLabels().get("CKS"));
+	}
+
+	@Test
 	public void unreadableSavedStateFallsBackToDefaults()
 	{
 		assertEquals(2, RingGroups.parse(GSON, defaults(), "{not json").view().size());
@@ -248,6 +325,10 @@ public class RingGroupsTest
 				Ring r = repo.ring(c.code);
 				assertTrue(d.id + " " + c.code, r != null && r.isDialable() && c.code.equals(DialMath.normalize(c.code)));
 				assertTrue(d.id + " " + c.code + " note", c.note == null || (c.note.length() <= 40 && c.note.matches("[ -~]*")));
+				// every prebuilt row says what it is for, in a name the loader keeps as it is
+				assertNotNull(d.id + " " + c.code + " label", c.label);
+				assertTrue(d.id + " " + c.code + " label", c.label.length() <= RingGroups.NAME_MAX && c.label.matches("[ -~]*")
+					&& c.label.equals(RingGroups.cleanName(c.label)));
 				codes++;
 			}
 			// nothing the loader would drop

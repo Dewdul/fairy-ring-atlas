@@ -4,8 +4,8 @@
       "id": "slayer",
       "name": "Slayer",
       "codes": [
-        {"code": "AJR", "note": "Fremennik Slayer Dungeon"},
-        {"code": "CKS", "note": "Kalphites"},
+        {"code": "AJR", "label": "Slayer cave", "note": "Fremennik Slayer Dungeon"},
+        {"code": "CKS", "label": "  Kalphite   Lair<> ", "note": "Kalphites"},
         {"code": "ZZZ", "note": "not a code"},
         {"code": "DKS"},
         {"code": "AJR", "note": "repeated"}
@@ -15,7 +15,7 @@
       "id": "farming",
       "name": "Farming",
       "codes": [
-        {"code": "CIR", "note": "Hespori, herbs"},
+        {"code": "CIR", "label": "Farming Guild", "note": "Hespori, herbs"},
         {"code": "AIQ"}
       ]
     },

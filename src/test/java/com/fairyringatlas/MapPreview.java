@@ -63,8 +63,8 @@ public class MapPreview
 		Rectangle big = new Rectangle(30, 30, 1100, 720);
 		Rectangle fixed = new Rectangle(30, 30, 512, 334);
 
-		java.awt.Insets wide = FairyRingAtlasPlugin.chromeInsets(false, false, false);
-		java.awt.Insets narrow = FairyRingAtlasPlugin.chromeInsets(true, false, false);
+		java.awt.Insets wide = FairyRingAtlasPlugin.chromeInsets(big.width, false, false, false);
+		java.awt.Insets narrow = FairyRingAtlasPlugin.chromeInsets(fixed.width, true, false, false);
 		groups = RingGroups.parse(new Gson(), RingGroups.defaults(RingRepository.read(new Gson(), BASE + "groups.json", RingGroups.DefFile.class)), null);
 		MapView fit = FairyRingAtlasPlugin.fitRings(MapView.of(surface, big), repo.ringsIn(Layer.SURFACE), 0, wide);
 		render(repo, painter, out, "1-fit", fit, "AIQ", null, new int[]{0, 1, 2}, false);
@@ -85,9 +85,9 @@ public class MapPreview
 		// the Groups panel open on the right with both prebuilt groups, a Slayer row hovered
 		groupsOpen = true;
 		render(repo, painter, out, "9-groups", FairyRingAtlasPlugin.fitRings(MapView.of(surface, free), repo.ringsIn(Layer.SURFACE), 0,
-			FairyRingAtlasPlugin.chromeInsets(false, true, false)), "CIR", "AJR", new int[]{0, 1, 2}, false);
+			FairyRingAtlasPlugin.chromeInsets(free.width, false, true, false)), "CIR", "AJR", new int[]{0, 1, 2}, false);
 		render(repo, painter, out, "10-groups-fixed", FairyRingAtlasPlugin.fitRings(MapView.of(surface, fixed), repo.ringsIn(Layer.SURFACE), 0,
-			FairyRingAtlasPlugin.chromeInsets(true, true, false)), "CKS", null, new int[]{1, 3, 0}, true);
+			FairyRingAtlasPlugin.chromeInsets(fixed.width, true, true, false)), "CKS", null, new int[]{1, 3, 0}, true);
 		groupsOpen = false;
 		ringChecks(repo, painter, out);
 		icons(repo, painter, out);

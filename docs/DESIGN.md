@@ -1223,19 +1223,25 @@ pre built groups for slayer and farming, but make it customizable so people can 
 click groups".
 
 **Data.** `groups.json` (beside `rings.json`) holds the prebuilt groups:
-`{"groups":[{"id":"slayer","name":"Slayer","codes":[{"code":"CKS","note":"..."}, ...]}, ...]}`. The
-order is the suggested use or run order; a note is an optional hint of at most 40 printable ASCII
-characters. Sources are in `tools/data/groups_sources.md`. A missing or unreadable file leaves only
+`{"groups":[{"id":"slayer","name":"Slayer","codes":[{"code":"CKS","label":"Slayer Tower","note":"..."}, ...]}, ...]}`.
+The order is the suggested use or run order. A label is the row's purpose-first name (at most 24
+printable ASCII characters, cleaned like a group name; every bundled row has one, based only on
+that row's researched note and sources); a note is an optional hint of at most 40 printable ASCII
+characters, shown on hover. Sources are in `tools/data/groups_sources.md`. A missing or unreadable file leaves only
 the player's own groups. `RingGroups.defaults` drops invalid and repeated codes.
 
 **Look and place.** The panel mirrors the left one (`ChromePainter.paintGroups`): a header row per
 group (collapse triangle, name, ring count) over ring rows like the Favourites rows (code chip with
-the lock state, then the name). Closed (the default), it is a 20x66 tab on the map's right edge,
+the lock state, then the row's label: the player's name for it, else the bundled label, else the
+ring's name; the search matches a row by its ring or by its label). Closed (the default), it is a 20x66 tab on the map's right edge,
 below the top bar, with "Groups" written down it; it is outlined when the search matches a grouped
-ring. Open, it is `PANEL_W` (150 px) wide against the right edge, from below the top bar down to
+ring. Open, it is `ChromePainter.groupsWidth(mapWidth)` wide against the right edge: `GROUPS_W`
+(190 px) so typical labels fit, but at most 30% of the map and never under `PANEL_W` (150 px), so on
+the 512 px fixed-mode map it is 153 px and long labels are cut short with "...". It reaches from below the top bar down to
 just above the first blocker in its column (`Scene.blockers()`: the holes and Teleport's covered
 slot, grown by 8 px for their frames), so it never covers Teleport or close.
-- `chromeInsets` takes the open panel off the right side, so fits and pans keep rings clear of it.
+- `chromeInsets(mapWidth, ...)` takes the open panel, at that same width, off the right side, so fits
+  and pans keep rings clear of it.
 - It is a `LabelPlacer` obstacle, and markers under it get no code label (like the left panel).
 - The card keeps left of the open panel, and clear of the closed tab (`ChromePainter.place`).
 - Rows dim with the search; a header dims when none of its rings match. The wheel scrolls the open
@@ -1257,12 +1263,14 @@ from the existing `onPostMenuSort` ownership, and saved locally.
   RuneLite submenu (`MenuEntry.createSubMenu`) listing every group, the ones that already hold the
   ring marked "(added)", and *New group...*. It sits below *Select* and *Zoom to*, so the left-click
   stays *Select*.
-- On a group's row: *Remove from* the group, as well as *Select* and *Zoom to*.
+- On a group's row: *Rename* (the row's label, typed in the chatbox, prefilled with the label it
+  shows), *Reset name* when the player has named it, *Remove from* the group, as well as *Select* and
+  *Zoom to*. A row's menu target is its code and label.
 - On a header: *Collapse* / *Expand* (left-click), *Rename*, *Delete group* and, for a prebuilt
   group that differs from its default, *Reset to default*.
 - The panel's **+** button: *New group*; right-click also offers *Restore group* for each prebuilt
   group the player deleted.
-- Names are typed in `ChatboxPanelManager.openTextInput`, RuneLite's own chatbox input, which core
+- Names (of groups and of rows) are typed in `ChatboxPanelManager.openTextInput`, RuneLite's own chatbox input, which core
   Fairy Rings uses for tags (hard rule 7 allows it). It takes the place of the game's travel log
   search box while open. Names keep printable ASCII only (the RuneScape fonts have nothing else),
   without `<` or `>` (menu tags), at most 24 characters. Deleting a group that holds rings is
@@ -1283,10 +1291,15 @@ injected Gson. Nothing is written until the player changes something. A profile 
 restart a plugin that stays enabled, so both keys are read again on each open, and the groups are
 parsed again when the saved string differs from the one this plugin last read or wrote. `RingGroups` is pure and unit tested
 (`RingGroupsTest`):
-- A saved prebuilt group stores only what differs from its default (name, codes); an edit that
+- A saved prebuilt group stores only what differs from its default (name, codes, row labels); an edit that
   makes it equal to the default again drops the difference, so an untouched group follows updates to
   `groups.json`, and *Reset to default* just forgets the changes. Notes always come from the bundled
   file.
+- Row labels the player typed are saved per group as `labels` (code to name), only for rows that
+  differ from their default (`RingGroups.renameRow` / `resetRow`): typing the bundled label, or for a
+  row without one the ring's name, is the default again. Removing a row forgets its name, so a ring
+  added again starts afresh; *Reset to default* clears a prebuilt group's names too, and any saved
+  name makes the group count as changed. On load, names for codes not in the group are dropped.
 - `seen` lists every prebuilt id ever offered: a deleted prebuilt group stays deleted, and one added
   by a later update joins at the end.
 - The player's own groups get ids `u1`, `u2`, ...; at most 30 groups (`GROUPS_MAX`). At the cap,
@@ -1301,12 +1314,12 @@ reads an immutable `groupsView` snapshot; the input thread reads only volatile s
 panel rectangle, scroll and drag fields).
 
 **Previews.** `9-groups.png` shows the panel open with both prebuilt groups on a 1738x905 map, a
-Slayer row hovered; `10-groups-fixed.png` shows it open on the 512x334 fixed-mode map, where it
-scrolls. The other previews show the closed tab.
+Slayer row hovered, every label in full at 190 px; `10-groups-fixed.png` shows it open on the
+512x334 fixed-mode map (153 px, long labels cut short), where it scrolls. The other previews show the closed tab.
 
 **Not verified without the game** (test in game):
 - the submenu: that RuneLite shows *Add to group*'s entries in the order intended (the last created
   entry at the top, as in the main menu), and that a submenu entry's `onClick` runs;
-- the chatbox input over the open travel log: typing a name, Enter and Esc, and that the log's search
+- the chatbox input over the open travel log (group and row names): typing a name, Enter and Esc, and that the log's search
   can be reopened afterwards;
 - dragging rows in a scrolled panel, and the wheel over the panel and its tab.

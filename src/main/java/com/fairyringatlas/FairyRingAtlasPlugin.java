@@ -949,17 +949,17 @@ public class FairyRingAtlasPlugin extends Plugin
 
 	/**
 	 * Screen space the chrome takes from the map: the top bar (and notice line), the Elsewhere
-	 * panel and an open Groups panel.
+	 * panel and an open Groups panel (as wide as on a map of this width).
 	 */
-	static Insets chromeInsets(boolean panelCollapsed, boolean groupsOpen, boolean notice)
+	static Insets chromeInsets(int mapWidth, boolean panelCollapsed, boolean groupsOpen, boolean notice)
 	{
 		return new Insets(ChromePainter.BAR_H + (notice ? 18 : 0), 6 + (panelCollapsed ? 20 : ChromePainter.PANEL_W), 0,
-			groupsOpen ? 6 + ChromePainter.PANEL_W : 0);
+			groupsOpen ? 6 + ChromePainter.groupsWidth(mapWidth) : 0);
 	}
 
 	private Insets insets(Rectangle rect)
 	{
-		return chromeInsets(isPanelCollapsed(rect.width), isGroupsOpen(rect.width), notice != null);
+		return chromeInsets(rect.width, isPanelCollapsed(rect.width), isGroupsOpen(rect.width), notice != null);
 	}
 
 	/** A layer's view fitted to its bounds, clear of the chrome. */
@@ -1246,6 +1246,23 @@ public class FairyRingAtlasPlugin extends Plugin
 			.build();
 	}
 
+	/** Asks for a group row's new label in the chatbox, prefilled with the one it shows. */
+	private void renameRow(String id, Ring r)
+	{
+		RingGroups.Group g = group(id);
+		if (g == null || !g.getCodes().contains(r.getCode()))
+		{
+			return;
+		}
+		String shown = g.getLabels().get(r.getCode());
+		chatboxPanelManager.openTextInput("Rename " + r.getCode() + " in " + g.getName())
+			.value(shown != null ? shown : r.getName())
+			.addCharValidator(c -> c != '<' && c != '>')
+			.onDone((Consumer<String>) label -> clientThread.invoke(() ->
+				editGroups(() -> groups.renameRow(id, r.getCode(), label, r.getName()))))
+			.build();
+	}
+
 	/** Deletes a group; one that holds rings is confirmed in the chatbox first. */
 	private void deleteGroup(String id)
 	{
@@ -1478,6 +1495,11 @@ public class FairyRingAtlasPlugin extends Plugin
 				if (group != null)
 				{
 					add(menu, "Remove from", group.getName(), m -> editGroups(() -> groups.remove(inGroup, r.getCode())));
+					if (group.getRenamed().contains(r.getCode()))
+					{
+						add(menu, "Reset name", hit.getTarget(), m -> editGroups(() -> groups.resetRow(inGroup, r.getCode())));
+					}
+					add(menu, "Rename", hit.getTarget(), m -> renameRow(inGroup, r));
 				}
 				if (r.isMapped())
 				{

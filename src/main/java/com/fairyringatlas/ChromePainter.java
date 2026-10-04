@@ -18,6 +18,8 @@ import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import lombok.Value;
 
 /**
@@ -31,6 +33,8 @@ public class ChromePainter
 	static final int BAR_H = 22;
 	private static final int BUTTON_H = 16;
 	static final int PANEL_W = 150;
+	/** Width of the open Groups panel on a roomy map; see {@link #groupsWidth}. */
+	static final int GROUPS_W = 190;
 	static final int CARD_W = 340;
 	/** Width of the default, compact card. */
 	static final int CARD_W_COMPACT = 280;
@@ -511,14 +515,14 @@ public class ChromePainter
 			}
 			return y + 12;
 		}
-		return paintRows(g, s, faves, Hit.FAVE, content, y) + 8;
+		return paintRows(g, s, faves, null, Hit.FAVE, content, y) + 8;
 	}
 
 	/**
 	 * Ring rows (code chip and name) of a list the player can reorder by dragging: the Favourites
-	 * or one group. Returns the y below them.
+	 * or one group, whose rows show their labels (null: the ring names). Returns the y below them.
 	 */
-	private int paintRows(Graphics2D g, Scene s, List<Ring> rings, String list, Rectangle content, int y)
+	private int paintRows(Graphics2D g, Scene s, List<Ring> rings, Map<String, String> labels, String list, Rectangle content, int y)
 	{
 		int sh = ink.height(ink.small);
 		int top = y;
@@ -531,11 +535,12 @@ public class ChromePainter
 			Rectangle row = new Rectangle(content.x, y, content.width, sh + 6);
 			boolean drag = s.dragging(list, r.getCode());
 			boolean hover = s.dragCode == null && s.mouse != null && row.contains(s.mouse) && content.contains(s.mouse);
-			if (drag || (s.searching() && !r.matches(s.query)))
+			String label = label(r, labels);
+			if (drag || (s.searching() && !rowMatches(s, r, label)))
 			{
 				g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, drag ? 0.3f : 0.4f));
 			}
-			paintRow(g, s, r, row, hover);
+			paintRow(g, s, r, label, row, hover);
 			g.setComposite(oldComp);
 			if (drag)
 			{
@@ -548,7 +553,7 @@ public class ChromePainter
 			}
 			if (content.intersects(row))
 			{
-				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, list, "Select", r.getCode() + " " + r.getName()));
+				s.hits.add(new Hit(Hit.Kind.CHIP, clipTo(row, content), r, list, "Select", r.getCode() + " " + label));
 			}
 			y += row.height + 2;
 		}
@@ -566,7 +571,7 @@ public class ChromePainter
 			g.fillRoundRect(ghost.x + 2, ghost.y + 3, ghost.width, ghost.height, 6, 6);
 			g.setColor(FILL_LIGHT);
 			g.fillRoundRect(ghost.x, ghost.y, ghost.width, ghost.height, 6, 6);
-			paintRow(g, s, dragged, ghost, true);
+			paintRow(g, s, dragged, label(dragged, labels), ghost, true);
 		}
 		return y;
 	}
@@ -585,7 +590,20 @@ public class ChromePainter
 		return at;
 	}
 
-	private void paintRow(Graphics2D g, Scene s, Ring r, Rectangle row, boolean hover)
+	/** A row's label: its group's label for the ring, else the ring's name. */
+	private static String label(Ring r, Map<String, String> labels)
+	{
+		String l = labels == null ? null : labels.get(r.getCode());
+		return l != null ? l : r.getName();
+	}
+
+	/** Whether the search matches a row: its ring, or the label the row shows. */
+	private static boolean rowMatches(Scene s, Ring r, String label)
+	{
+		return r.matches(s.query) || label.toLowerCase(Locale.ROOT).contains(s.query.toLowerCase(Locale.ROOT).trim());
+	}
+
+	private void paintRow(Graphics2D g, Scene s, Ring r, String label, Rectangle row, boolean hover)
 	{
 		int sh = ink.height(ink.small);
 		boolean sel = r.getCode().equals(s.selected);
@@ -600,7 +618,7 @@ public class ChromePainter
 		Rectangle chip = new Rectangle(row.x + 3, row.y + 2, chipWidth(s, r), sh + 2);
 		chip(g, s, r, chip);
 		int tx = chip.x + chip.width + 5;
-		ink.text(g, ink.fit(r.getName(), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
+		ink.text(g, ink.fit(label, ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
 	}
 
 	/** Largest useful panel scroll of the last paint, for the input handler to clamp to. */
@@ -624,11 +642,21 @@ public class ChromePainter
 
 	// ------------------------------------------------------------------ Groups panel
 
+	/**
+	 * The open Groups panel's width on a map this wide: {@link #GROUPS_W}, so most row labels fit,
+	 * but at most 30% of the map (labels are cut short instead) and never narrower than the left panel.
+	 */
+	static int groupsWidth(int mapWidth)
+	{
+		return Math.max(PANEL_W, Math.min(GROUPS_W, mapWidth * 30 / 100));
+	}
+
 	/** The Groups panel against the map's right edge, stopping above Teleport and close; or its tab. */
 	private static Rectangle groupsRect(Scene s, int top)
 	{
 		MapView v = s.view;
 		int right = v.getX() + v.getW() - 6;
+		int w = groupsWidth(v.getW());
 		if (!s.groupsOpen)
 		{
 			return new Rectangle(right - 20, top, 20, GROUPS_TAB_H);
@@ -638,12 +666,12 @@ public class ChromePainter
 		{
 			// with room for the holes' frames and shadow
 			Rectangle gb = AtlasPainter.grow(b, 8);
-			if (gb.x < right && gb.x + gb.width > right - PANEL_W && gb.y < bottom && gb.y + gb.height > top)
+			if (gb.x < right && gb.x + gb.width > right - w && gb.y < bottom && gb.y + gb.height > top)
 			{
 				bottom = Math.min(bottom, gb.y);
 			}
 		}
-		return new Rectangle(right - PANEL_W, top, PANEL_W, Math.max(GROUPS_TAB_H, bottom - top));
+		return new Rectangle(right - w, top, w, Math.max(GROUPS_TAB_H, bottom - top));
 	}
 
 	/** A group's rings, in its order, leaving out codes the data does not know. */
@@ -665,7 +693,7 @@ public class ChromePainter
 	{
 		for (Ring r : rings(s, group))
 		{
-			if (r.matches(s.query))
+			if (rowMatches(s, r, label(r, group.getLabels())))
 			{
 				return true;
 			}
@@ -775,7 +803,7 @@ public class ChromePainter
 					y += sh;
 				}
 			}
-			y = paintRows(g, s, rings, Hit.groupRow(gr.getId()), content, y) + 6;
+			y = paintRows(g, s, rings, gr.getLabels(), Hit.groupRow(gr.getId()), content, y) + 6;
 		}
 		g.setClip(oldClip);
 		int overflow = y + s.groupsScroll - (content.y + content.height);

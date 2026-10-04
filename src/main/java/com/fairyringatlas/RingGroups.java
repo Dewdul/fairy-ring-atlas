@@ -10,7 +10,10 @@ import com.google.gson.JsonParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.Value;
 
@@ -18,7 +21,8 @@ import lombok.Value;
  * The quick-click groups of the map's Groups panel: the prebuilt ones from groups.json (Slayer,
  * Farming) and the player's own. Prebuilt groups stay editable; a saved group keeps only what
  * differs from its default, so an untouched one follows the bundled data and "Reset to default"
- * just forgets the changes. Pure: the plugin keeps one instance on the client thread and saves
+ * just forgets the changes. Each row shows a label: the player's own name for it, else the bundled
+ * one (prebuilt rows say what they are for, e.g. "Dagannoths (Lighthouse)"), else the ring's name. Pure: the plugin keeps one instance on the client thread and saves
  * {@link #format} after each change.
  */
 final class RingGroups
@@ -26,10 +30,11 @@ final class RingGroups
 	static final int NAME_MAX = 24;
 	static final int GROUPS_MAX = 30;
 
-	/** A code in groups.json, with an optional short display hint. */
+	/** A code in groups.json, with an optional row label (what it is for) and a short display hint. */
 	static final class Code
 	{
 		String code;
+		String label;
 		String note;
 	}
 
@@ -53,12 +58,16 @@ final class RingGroups
 		List<String> seen;
 	}
 
-	/** A saved group; for a prebuilt one a null name or codes means "as the default". */
+	/**
+	 * A saved group; for a prebuilt one a null name or codes means "as the default". Labels are the
+	 * player's own row names by code, null when there are none.
+	 */
 	private static final class Stored
 	{
 		String id;
 		String name;
 		List<String> codes;
+		Map<String, String> labels;
 		Boolean collapsed;
 
 		Stored(String id)
@@ -67,13 +76,19 @@ final class RingGroups
 		}
 	}
 
-	/** A group as the panel shows it. */
+	/**
+	 * A group as the panel shows it. Labels hold each row's label by code where it has one (the
+	 * player's or the bundled one); a row without one shows its ring's name. Renamed holds the codes
+	 * the player named, which "Reset name" can take back.
+	 */
 	@Value
 	static class Group
 	{
 		String id;
 		String name;
 		List<String> codes;
+		Map<String, String> labels;
+		Set<String> renamed;
 		boolean collapsed;
 		boolean prebuilt;
 		boolean modified;
@@ -115,6 +130,7 @@ final class RingGroups
 				{
 					Code k = new Code();
 					k.code = n;
+					k.label = cleanName(code.label);
 					k.note = code.note;
 					c.codes.add(k);
 				}
@@ -163,6 +179,20 @@ final class RingGroups
 				{
 					c.name = s.id;
 				}
+				if (s.labels != null)
+				{
+					List<String> codes = g.codes(c);
+					for (Map.Entry<String, String> e : s.labels.entrySet())
+					{
+						String code = DialMath.normalize(e.getKey());
+						String label = cleanName(e.getValue());
+						if (code != null && label != null && codes.contains(code))
+						{
+							c.labels = c.labels == null ? new LinkedHashMap<>() : c.labels;
+							c.labels.put(code, label);
+						}
+					}
+				}
 				g.groups.add(c);
 				g.simplify(c);
 			}
@@ -203,8 +233,20 @@ final class RingGroups
 		for (Stored s : groups)
 		{
 			boolean prebuilt = def(s.id) != null;
-			out.add(new Group(s.id, name(s), Collections.unmodifiableList(new ArrayList<>(codes(s))),
-				Boolean.TRUE.equals(s.collapsed), prebuilt, prebuilt && (s.name != null || s.codes != null)));
+			List<String> codes = codes(s);
+			Map<String, String> labels = new LinkedHashMap<>();
+			for (String c : codes)
+			{
+				String l = s.labels != null && s.labels.containsKey(c) ? s.labels.get(c) : bundledLabel(s.id, c);
+				if (l != null)
+				{
+					labels.put(c, l);
+				}
+			}
+			Set<String> renamed = s.labels == null ? Collections.<String>emptySet() : new LinkedHashSet<>(s.labels.keySet());
+			out.add(new Group(s.id, name(s), Collections.unmodifiableList(new ArrayList<>(codes)),
+				Collections.unmodifiableMap(labels), Collections.unmodifiableSet(renamed), Boolean.TRUE.equals(s.collapsed),
+				prebuilt, prebuilt && (s.name != null || s.codes != null || s.labels != null)));
 		}
 		return out;
 	}
@@ -277,6 +319,11 @@ final class RingGroups
 		List<String> list = new ArrayList<>(codes(s));
 		list.remove(code);
 		s.codes = list;
+		// the player's name for the row goes with it; added again, it starts afresh
+		if (s.labels != null)
+		{
+			s.labels.remove(code);
+		}
 		simplify(s);
 		return true;
 	}
@@ -311,6 +358,44 @@ final class RingGroups
 		return true;
 	}
 
+	/**
+	 * Names a group's row. A name equal to the row's default (the bundled label, else the ring's
+	 * name, given by the caller) is the default again. Returns whether anything changed.
+	 */
+	boolean renameRow(String id, String code, String label, String ringName)
+	{
+		Stored s = find(id);
+		String l = cleanName(label);
+		if (s == null || l == null || !codes(s).contains(code))
+		{
+			return false;
+		}
+		String fallback = bundledLabel(id, code);
+		if (l.equals(fallback != null ? fallback : cleanName(ringName)))
+		{
+			return resetRow(id, code);
+		}
+		if (s.labels != null && l.equals(s.labels.get(code)))
+		{
+			return false;
+		}
+		s.labels = s.labels == null ? new LinkedHashMap<>() : s.labels;
+		s.labels.put(code, l);
+		return true;
+	}
+
+	/** A row back to its default label (the bundled one, else the ring's name). */
+	boolean resetRow(String id, String code)
+	{
+		Stored s = find(id);
+		if (s == null || s.labels == null || s.labels.remove(code) == null)
+		{
+			return false;
+		}
+		simplify(s);
+		return true;
+	}
+
 	boolean delete(String id)
 	{
 		return groups.remove(find(id));
@@ -327,7 +412,7 @@ final class RingGroups
 		return true;
 	}
 
-	/** A prebuilt group back to its bundled name and codes. */
+	/** A prebuilt group back to its bundled name, codes and row labels. */
 	boolean reset(String id)
 	{
 		Stored s = find(id);
@@ -337,6 +422,7 @@ final class RingGroups
 		}
 		s.name = null;
 		s.codes = null;
+		s.labels = null;
 		return true;
 	}
 
@@ -402,6 +488,23 @@ final class RingGroups
 		return null;
 	}
 
+	/** The bundled label of a code in a prebuilt group, or null. */
+	private String bundledLabel(String id, String code)
+	{
+		Def d = def(id);
+		if (d != null)
+		{
+			for (Code c : d.codes)
+			{
+				if (c.code.equals(code))
+				{
+					return c.label;
+				}
+			}
+		}
+		return null;
+	}
+
 	private String name(Stored s)
 	{
 		Def d = def(s.id);
@@ -429,6 +532,12 @@ final class RingGroups
 	/** A prebuilt group that matches its default again goes back to following it. */
 	private void simplify(Stored s)
 	{
+		if (s.labels != null)
+		{
+			// a row named as bundled is the default again, and no names at all are stored as none
+			s.labels.entrySet().removeIf(e -> e.getValue().equals(bundledLabel(s.id, e.getKey())));
+			s.labels = s.labels.isEmpty() ? null : s.labels;
+		}
 		Def d = def(s.id);
 		if (d == null)
 		{
