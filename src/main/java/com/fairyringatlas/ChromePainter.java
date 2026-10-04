@@ -987,21 +987,6 @@ public class ChromePainter
 			{
 				lines.add(new Line(ink.fit(status.toString(), ink.small, textW), ink.small, statusColor, 0));
 			}
-			// the game's own one-click teleports from any ring, without opening the dials
-			String oneClick = s.repo.isFavourite(ring.getCode()) ? "Favourites > " + ring.getCode()
-				: ring.getCode().equals(s.repo.getLastCode()) ? "Last-destination (" + ring.getCode() + ")" : null;
-			if (oneClick != null)
-			{
-				String tip = "1 click: right-click " + (full ? "any fairy ring" : "a ring") + " > " + oneClick;
-				if (full)
-				{
-					addWrapped(lines, tip, ink.small, HINT, textW, 0);
-				}
-				else
-				{
-					lines.add(new Line(ink.fit(tip, ink.small, textW), ink.small, HINT, 0));
-				}
-			}
 		}
 		if (ring == s.hovered && (s.hoveredNote != null || s.hoveredDetails != null))
 		{

@@ -1112,10 +1112,9 @@ default font when `FontManager` is unavailable).
   Left-click selects the ring and focuses it at no less than 2 ppt, switching layer when
   needed. Rows dim with the search like the cards. With no favourites, a grey line says
   to star a code in the travel log.
-- The info card adds a hint line for a favourite, "1 click: right-click any fairy ring >
-  Favourites > CODE", and for the last destination, "... > Last-destination (CODE)".
-  These point at the game's own one-click teleports; the plugin adds nothing to the ring's
-  menu.
+- The card's one-click hint for favourites and the last destination ("1 click: right-click
+  any fairy ring > Favourites > CODE") was removed at the user's request: it repeated what the
+  status line already says.
 
 ### In-game feedback, 2026-10-03
 
