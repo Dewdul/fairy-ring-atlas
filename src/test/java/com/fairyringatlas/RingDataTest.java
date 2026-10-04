@@ -374,6 +374,19 @@ public class RingDataTest
 	}
 
 	@Test
+	public void openingAnAreaPicksItsFirstUsableRing()
+	{
+		RingRepository repo = real();
+		repo.setState(new HashSet<>(), new java.util.HashMap<>(), null);
+		assertEquals("BKS", repo.defaultRing("zanaris").getCode());
+		// The Abyss has ALR and DIP: the first, unless only a later one is in the travel log
+		assertEquals("ALR", repo.defaultRing("abyss").getCode());
+		repo.setState(new HashSet<>(Arrays.asList("DIP")), new java.util.HashMap<>(), null);
+		assertEquals("DIP", repo.defaultRing("abyss").getCode());
+		assertNull(repo.defaultRing("no-such-layer"));
+	}
+
+	@Test
 	public void favouritesListInBlockOrder()
 	{
 		RingRepository repo = real();

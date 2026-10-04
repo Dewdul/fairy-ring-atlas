@@ -404,7 +404,10 @@ public class ChromePainter
 				}
 				else
 				{
-					s.hits.add(new Hit(Hit.Kind.CARD, clipTo(card, content), null, c.id, "Open", c.name));
+					// a click opens the area and selects its first usable ring
+					Ring pick = s.repo.defaultRing(c.id);
+					s.hits.add(pick == null ? new Hit(Hit.Kind.CARD, clipTo(card, content), null, c.id, "Open", c.name)
+						: new Hit(Hit.Kind.CARD, clipTo(card, content), pick, c.id, "Select", pick.getCode() + " " + pick.getName()));
 				}
 			}
 			for (int i = 0; i < c.rings.size(); i++)

@@ -201,7 +201,8 @@ public class AtlasOverlay extends Overlay
 		if (!client.isMenuOpen())
 		{
 			Hit hover = plugin.isMapInput(mp.getX(), mp.getY()) ? plugin.hitAt(mp.getX(), mp.getY()) : null;
-			s.hovered = hover != null && (hover.getKind() == Hit.Kind.MARKER || hover.getKind() == Hit.Kind.CHIP) ? hover.getRing() : null;
+			s.hovered = hover != null && (hover.getKind() == Hit.Kind.MARKER || hover.getKind() == Hit.Kind.CHIP
+				|| hover.getKind() == Hit.Kind.CARD) ? hover.getRing() : null;
 		}
 		if (!plugin.isMapInput(mp.getX(), mp.getY()))
 		{

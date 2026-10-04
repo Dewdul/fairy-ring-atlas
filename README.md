@@ -6,7 +6,7 @@ Fairy Ring Atlas replaces the fairy ring dials with a map of every fairy ring de
 
 - **Map of every ring.** All 42 surface rings appear on a world map. You can zoom from an overview of the whole map down to individual buildings: scroll to zoom and drag to pan.
 - **Favourites list.** Your in-game favourites (starred in the travel log) are listed at the top of the side panel. Click one to select it and zoom to it. Its card also reminds you of the game's own one-click teleport: right-click any fairy ring, then *Favourites*. Your last destination gets the same tip for *Last-destination*.
-- **Off-surface destinations.** These include Zanaris, the Abyss, Mor Ul Rek, the Cosmic entity's plane and the other realms. Each one has a map of its own, opened from the *Elsewhere* section of the side panel or from a portal marker on the surface. *Your house* (DIQ) has a card.
+- **Off-surface destinations.** These include Zanaris, the Abyss, Mor Ul Rek, the Cosmic entity's plane and the other realms. Each one has a map of its own, opened from the *Elsewhere* section of the side panel or from a portal marker on the surface. Opening one also selects its ring (the first one in your travel log, when an area has two). *Your house* (DIQ) has a card.
 - **Ring cards.** Hover over any ring for its code, name and area. The card also shows:
   - whether the ring is in your travel log;
   - what is nearby;

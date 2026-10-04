@@ -981,6 +981,12 @@ public class FairyRingAtlasPlugin extends Plugin
 	/** An Elsewhere card or a portal: open its layer, or fit the layer again when it is already open. */
 	void openCard(String id)
 	{
+		// most of these areas have a single ring: opening one selects its (first usable) ring
+		Ring first = repo.defaultRing(id);
+		if (first != null)
+		{
+			select(first.getCode(), false);
+		}
 		Layer l = repo.layer(id);
 		MapView v = view;
 		if (l != null && v != null && !l.isSurface() && l.getId().equals(v.getLayer()))

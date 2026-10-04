@@ -438,6 +438,23 @@ public class RingRepository
 		return out;
 	}
 
+	/**
+	 * The ring a click on a layer's card (or portal) selects: the first one in the travel log,
+	 * else the first; null for a layer with no dialable ring.
+	 */
+	public Ring defaultRing(String layerId)
+	{
+		List<Ring> rings = ringsIn(layerId);
+		for (Ring r : rings)
+		{
+			if (hasLogRow(r.getCode()))
+			{
+				return r;
+			}
+		}
+		return rings.isEmpty() ? null : rings.get(0);
+	}
+
 	/** Rings on the map layer: destinations plus the informational sequence/exit entries. */
 	public List<Ring> mappedIn(String layerId)
 	{

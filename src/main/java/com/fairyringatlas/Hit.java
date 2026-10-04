@@ -22,7 +22,7 @@ public class Hit
 		MARKER,
 		/** A ring chip in an Elsewhere card, or a Favourites row (id FAVE); ring is set. */
 		CHIP,
-		/** An Elsewhere card; id is the layer id (or "poh"). */
+		/** An Elsewhere card; id is the layer id; ring is the ring a click selects, if any. */
 		CARD,
 		/** A surface entrance to a layer; id is the layer id. */
 		PORTAL,
