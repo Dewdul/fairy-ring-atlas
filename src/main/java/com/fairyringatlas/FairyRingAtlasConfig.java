@@ -89,6 +89,14 @@ public interface FairyRingAtlasConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(keyName = "fullDetails", name = "Full ring details",
+		description = "Show everything about a ring on its card (description, every nearby place, notes) instead of a short summary",
+		section = mapSection, position = 7)
+	default boolean fullDetails()
+	{
+		return false;
+	}
+
 	@ConfigItem(keyName = "codeLabels", name = "Code labels",
 		description = "Which rings show their code beside the marker", section = markerSection, position = 0)
 	default Scene.CodeLabels codeLabels()
@@ -96,8 +104,8 @@ public interface FairyRingAtlasConfig extends Config
 		return Scene.CodeLabels.ALL;
 	}
 
-	@ConfigItem(keyName = "dimUnvisited", name = "Dim unvisited",
-		description = "Draw rings that are not in your travel log at half opacity", section = markerSection, position = 1)
+	@ConfigItem(keyName = "dimUnvisited", name = "Dim locked rings",
+		description = "Draw rings you have not unlocked (not in your travel log yet) at half opacity", section = markerSection, position = 1)
 	default boolean dimUnvisited()
 	{
 		return false;

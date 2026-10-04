@@ -62,6 +62,8 @@ public final class Scene
 	public boolean placeLabels = true;
 	public boolean mapIcons = true;
 	public boolean dimUnvisited;
+	/** The ring card shows everything rather than a short summary. */
+	public boolean fullDetails;
 	public Color visitedColor = new Color(0x3FD9C8);
 	public Color selectedColor = new Color(0xFF981F);
 	public Color favouriteColor = new Color(0xFFD700);

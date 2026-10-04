@@ -192,6 +192,7 @@ public class AtlasOverlay extends Overlay
 		s.placeLabels = config.placeLabels();
 		s.mapIcons = config.mapIcons();
 		s.dimUnvisited = config.dimUnvisited();
+		s.fullDetails = config.fullDetails();
 		s.visitedColor = config.visitedColor();
 		s.selectedColor = config.selectedColor();
 		s.favouriteColor = config.favouriteColor();

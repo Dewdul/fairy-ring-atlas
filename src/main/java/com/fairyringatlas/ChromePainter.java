@@ -30,6 +30,8 @@ public class ChromePainter
 	private static final int BUTTON_H = 16;
 	static final int PANEL_W = 150;
 	static final int CARD_W = 340;
+	/** Width of the default, compact card. */
+	static final int CARD_W_COMPACT = 280;
 	static final int CARD_MAX_H = 260;
 	/** Menu target of the panel's show/hide toggle. */
 	private static final String PANEL_NAME = "Favourites and Elsewhere";
@@ -135,7 +137,7 @@ public class ChromePainter
 		return java.util.Objects.hash(v.getX(), v.getY(), v.getW(), v.getH(), v.getLayer(), s.selected, s.hovered,
 			java.util.Arrays.hashCode(s.dials), s.query, s.rowVisible, s.notice, s.panelCollapsed, s.panelScroll,
 			s.now < s.flashUntil, flash, hover, s.holes, s.teleportSlot, s.repo.getStateHash(), s.here,
-			s.visitedColor, s.selectedColor, s.favouriteColor, focusCovered(s));
+			s.visitedColor, s.selectedColor, s.favouriteColor, s.fullDetails, focusCovered(s));
 	}
 
 	private BufferedImage layer;
@@ -368,7 +370,7 @@ public class ChromePainter
 			int cy = y + 4 + sh + 2;
 			for (Ring r : c.rings)
 			{
-				int w = ink.width(ink.small, r.getCode()) + 8;
+				int w = chipWidth(s, r);
 				if (cx + w > content.x + content.width - 4 && cx > content.x + 5)
 				{
 					cx = content.x + 5;
@@ -471,7 +473,7 @@ public class ChromePainter
 				g.setStroke(new BasicStroke(1f));
 				g.drawRoundRect(row.x, row.y, row.width - 1, row.height - 1, 6, 6);
 			}
-			Rectangle chip = new Rectangle(row.x + 3, row.y + 2, ink.width(ink.small, r.getCode()) + 8, sh + 2);
+			Rectangle chip = new Rectangle(row.x + 3, row.y + 2, chipWidth(s, r), sh + 2);
 			chip(g, s, r, chip);
 			int tx = chip.x + chip.width + 5;
 			ink.text(g, ink.fit(r.getName(), ink.small, row.x + row.width - 3 - tx), ink.small, sel ? TITLE : CREAM, tx, row.y + 3, Ink.Style.SHADOW);
@@ -487,6 +489,12 @@ public class ChromePainter
 
 	/** Largest useful panel scroll of the last paint, for the input handler to clamp to. */
 	volatile int panelScrollMax;
+
+	/** A code chip is the code, plus a padlock in front when the ring is not unlocked yet. */
+	private int chipWidth(Scene s, Ring r)
+	{
+		return ink.width(ink.small, r.getCode()) + 8 + (s.repo.isVisited(r.getCode()) ? 0 : 8);
+	}
 
 	private void chip(Graphics2D g, Scene s, Ring r, Rectangle c)
 	{
@@ -511,7 +519,13 @@ public class ChromePainter
 			g.drawRoundRect(c.x - 1, c.y - 1, c.width + 1, c.height + 1, 6, 6);
 		}
 		Color text = sel || visited ? Ink.DARK : new Color(0xC9CFCD);
-		ink.text(g, code, ink.small, text, c.x + 4, c.y + 1, Ink.Style.PLAIN);
+		int tx = c.x + 4;
+		if (!visited)
+		{
+			AtlasPainter.drawPadlock(g, c.x + 7, c.y + c.height / 2.0, 5, sel ? Ink.DARK : AtlasPainter.LOCK);
+			tx += 8;
+		}
+		ink.text(g, code, ink.small, text, tx, c.y + 1, Ink.Style.PLAIN);
 	}
 
 	private void panelBox(Graphics2D g, Rectangle p)
@@ -549,15 +563,17 @@ public class ChromePainter
 		Ring ring = s.hovered != null ? s.hovered : s.repo.ring(s.selected);
 		MapView v = s.view;
 		int left = s.panel != null ? s.panel.x + s.panel.width + 6 : v.getX() + 6;
-		int maxW = Math.min(Math.min(CARD_W, Math.max(220, v.getW() * 45 / 100)), v.getX() + v.getW() - 6 - left);
+		int maxW = Math.min(Math.min(s.fullDetails ? CARD_W : CARD_W_COMPACT, Math.max(220, v.getW() * 45 / 100)),
+			v.getX() + v.getW() - 6 - left);
 		// on a small (fixed mode) map the card keeps to under half the height so the map stays usable
 		int maxH = Math.min(CARD_MAX_H, v.getH() * (v.getH() < 450 ? 48 : 62) / 100);
 		java.awt.Point focus = cardFocus(s);
 		if (ring == null)
 		{
 			String hint = "Click a fairy ring to plan your trip";
-			int w = ink.width(ink.small, hint) + 12;
-			int hh = ink.height(ink.small) + 8;
+			int lh = ink.height(ink.small);
+			int w = Math.max(ink.width(ink.small, hint), 22 + ink.width(ink.small, "Unlocked") + 26 + ink.width(ink.small, "Locked")) + 12;
+			int hh = lh * 2 + 12;
 			Rectangle r = place(s, left, w, hh, hh, null);
 			// like the card, the hint keeps labels from under it and absorbs presses
 			s.card = r;
@@ -566,76 +582,130 @@ public class ChromePainter
 				s.hits.add(new Hit(Hit.Kind.BLOCK, r, null, null, null, null));
 				panelBox(g, r);
 				ink.text(g, hint, ink.small, GREY, r.x + 6, r.y + 4, Ink.Style.SHADOW);
+				// legend: unlocked (in the travel log) and locked rings
+				int ly = r.y + 8 + lh;
+				double cy = ly + lh / 2.0;
+				g.setColor(s.visitedColor);
+				g.setStroke(new BasicStroke(1.6f));
+				g.draw(AtlasPainter.circle(r.x + 12, cy, 4.5));
+				int x = r.x + 22;
+				ink.text(g, "Unlocked", ink.small, s.visitedColor, x, ly, Ink.Style.SHADOW);
+				x += ink.width(ink.small, "Unlocked") + 12;
+				AtlasPainter.drawPadlock(g, x + 4, cy, 6, AtlasPainter.LOCK);
+				ink.text(g, "Locked", ink.small, AMBER, x + 14, ly, Ink.Style.SHADOW);
 			}
 			return;
 		}
-		int pad = 8;
+		int pad = s.fullDetails ? 8 : 6;
 		int textW = maxW - pad * 2;
 		boolean isSelected = ring.getCode() != null && ring.getCode().equals(s.selected);
 		boolean visited = !ring.isDialable() || s.repo.isVisited(ring.getCode());
+		boolean full = s.fullDetails;
 
 		List<Line> lines = new ArrayList<>();
 		String title = (ring.getCode() != null && ring.isDialable() ? ring.getCode() + "  " : "") + ring.getName();
-		for (String t : ink.wrap(title, ink.bold, textW))
+		if (full)
 		{
-			lines.add(new Line(t, ink.bold, TITLE, 0));
+			for (String t : ink.wrap(title, ink.bold, textW))
+			{
+				lines.add(new Line(t, ink.bold, TITLE, 0));
+			}
+			if (ring.getArea() != null)
+			{
+				lines.add(new Line(ink.fit(ring.getArea(), ink.small, textW), ink.small, GREY, 0));
+			}
 		}
-		if (ring.getArea() != null)
+		else
 		{
-			lines.add(new Line(ink.fit(ring.getArea(), ink.small, textW), ink.small, GREY, 0));
+			lines.add(new Line(ink.fit(title, ink.bold, textW), ink.bold, TITLE, 0));
 		}
 		if (ring.isDialable())
 		{
-			StringBuilder status = new StringBuilder(visited ? "In your travel log" : "Not in your travel log");
+			StringBuilder status = new StringBuilder(visited ? (full ? "Unlocked - in your travel log" : "Unlocked")
+				: (full ? "Locked - not in your travel log yet" : "Locked - not in your travel log"));
 			if (s.repo.isFavourite(ring.getCode()))
 			{
 				status.append(" - favourite");
 			}
 			if (ring.getCode().equals(s.repo.getLastCode()))
 			{
-				status.append(" - last destination");
+				status.append(full ? " - last destination" : " - last used");
 			}
 			if (ring.getCode().equals(s.here))
 			{
 				status.append(" - you are here");
 			}
-			lines.add(new Line(ink.fit(status.toString(), ink.small, textW), ink.small, visited ? s.visitedColor : GREY, 2));
+			lines.add(new Line(ink.fit(status.toString(), ink.small, textW), ink.small, visited ? s.visitedColor : AMBER, full ? 2 : 0));
 			// the game's own one-click teleports from any ring, without opening the dials
 			String oneClick = s.repo.isFavourite(ring.getCode()) ? "Favourites > " + ring.getCode()
 				: ring.getCode().equals(s.repo.getLastCode()) ? "Last-destination (" + ring.getCode() + ")" : null;
 			if (oneClick != null)
 			{
-				addWrapped(lines, "1 click: right-click any fairy ring > " + oneClick, ink.small, HINT, textW, 0);
+				String tip = "1 click: right-click " + (full ? "any fairy ring" : "a ring") + " > " + oneClick;
+				if (full)
+				{
+					addWrapped(lines, tip, ink.small, HINT, textW, 0);
+				}
+				else
+				{
+					lines.add(new Line(ink.fit(tip, ink.small, textW), ink.small, HINT, 0));
+				}
 			}
 		}
-		addWrapped(lines, ring.getDescription(), ink.regular, Color.WHITE, textW, 4);
-		boolean first = true;
-		for (String req : ring.getRequirements())
+		if (full)
 		{
-			addWrapped(lines, "- " + req, ink.small, visited ? GREY : AMBER, textW, first ? 4 : 0);
-			first = false;
+			addWrapped(lines, ring.getDescription(), ink.regular, Color.WHITE, textW, 4);
+			boolean first = true;
+			for (String req : ring.getRequirements())
+			{
+				addWrapped(lines, "- " + req, ink.small, visited ? GREY : AMBER, textW, first ? 4 : 0);
+				first = false;
+			}
+			if (ring.isNoStaffReturn() && !s.repo.isStaffless())
+			{
+				// the game's no_staff_return flag: this ring works without a staff, but only to Zanaris
+				addWrapped(lines, "No staff needed to leave: this ring can take you back to Zanaris.", ink.small, GREY, textW, 4);
+			}
+			first = true;
+			for (String d : ring.getDanger())
+			{
+				addWrapped(lines, "! " + d, ink.small, DANGER, textW, first ? 4 : 0);
+				first = false;
+			}
+			// places come after what the player must know before going, so a short card cuts them first
+			List<String> poi = ring.getPoi();
+			if (!poi.isEmpty())
+			{
+				addWrapped(lines, "Nearby: " + String.join(", ", poi.subList(0, Math.min(6, poi.size()))), ink.small, CREAM, textW, 4);
+			}
+			List<String> notes = ring.getNotes();
+			for (int i = 0; i < Math.min(2, notes.size()); i++)
+			{
+				addWrapped(lines, notes.get(i), ink.small, new Color(0xB8C4D6), textW, i == 0 ? 4 : 0);
+			}
 		}
-		if (ring.isNoStaffReturn() && !s.repo.isStaffless())
+		else
 		{
-			// the game's no_staff_return flag: this ring works without a staff, but only to Zanaris
-			addWrapped(lines, "No staff needed to leave: this ring can take you back to Zanaris.", ink.small, GREY, textW, 4);
-		}
-		first = true;
-		for (String d : ring.getDanger())
-		{
-			addWrapped(lines, "! " + d, ink.small, DANGER, textW, first ? 4 : 0);
-			first = false;
-		}
-		// places come after what the player must know before going, so a short card cuts them first
-		List<String> poi = ring.getPoi();
-		if (!poi.isEmpty())
-		{
-			addWrapped(lines, "Nearby: " + String.join(", ", poi.subList(0, Math.min(6, poi.size()))), ink.small, CREAM, textW, 4);
-		}
-		List<String> notes = ring.getNotes();
-		for (int i = 0; i < Math.min(2, notes.size()); i++)
-		{
-			addWrapped(lines, notes.get(i), ink.small, new Color(0xB8C4D6), textW, i == 0 ? 4 : 0);
+			// the summary: what is there, what stops you (only until you have been) and the worst danger,
+			// one line each
+			List<String> poi = ring.getPoi();
+			if (!poi.isEmpty())
+			{
+				lines.add(new Line(ink.fit("Near: " + String.join(", ", poi.subList(0, Math.min(3, poi.size()))), ink.small, textW),
+					ink.small, CREAM, 3));
+			}
+			if (!visited)
+			{
+				List<String> reqs = ring.getRequirements();
+				for (int i = 0; i < Math.min(2, reqs.size()); i++)
+				{
+					lines.add(new Line(ink.fit("- " + reqs.get(i), ink.small, textW), ink.small, AMBER, 0));
+				}
+			}
+			if (!ring.getDanger().isEmpty())
+			{
+				lines.add(new Line(ink.fit("! " + ring.getDanger().get(0), ink.small, textW), ink.small, DANGER, 0));
+			}
 		}
 
 		// the next step for the selected ring
@@ -656,7 +726,7 @@ public class ChromePainter
 			}
 			else
 			{
-				step = new Line("Not in your travel log yet - dial it:", ink.small, HINT, 6);
+				step = new Line("Locked: a first visit unlocks it. Dial it by hand:", ink.small, HINT, 6);
 				dialRow = s.dials != null;
 			}
 		}

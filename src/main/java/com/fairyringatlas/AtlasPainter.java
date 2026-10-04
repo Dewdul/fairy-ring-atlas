@@ -41,6 +41,8 @@ public class AtlasPainter
 
 	static final Color UNVISITED = new Color(0x93B5B0);
 	static final Color UNVISITED_DOT = new Color(0x6E8C88);
+	/** The padlock on rings that are not unlocked yet. */
+	static final Color LOCK = new Color(0xD8DEDC);
 	static final Color INFO = new Color(0xB79CE8);
 	static final Color PORTAL = new Color(0xD7B8FF);
 	static final Color CLUE = new Color(0xE8322C);
@@ -435,10 +437,15 @@ public class AtlasPainter
 			double a = Math.PI / 4 * i + Math.PI / 8;
 			g.fill(circle(cx + Math.cos(a) * r, cy + Math.sin(a) * r, dot));
 		}
-		if (visited || selected)
+		if (visited)
 		{
 			g.setColor(withAlpha(main, 90));
 			g.fill(circle(cx, cy, r * 0.45));
+		}
+		else
+		{
+			// not unlocked (not in the travel log yet): a padlock in the middle
+			drawPadlock(g, cx, cy, Math.max(5, r * 0.95), selected ? main : LOCK);
 		}
 		if (selected)
 		{
@@ -523,6 +530,24 @@ public class AtlasPainter
 		g.fill(p);
 		g.setColor(Color.WHITE);
 		g.fill(circle(x, y - 10, 2));
+	}
+
+	/** A small padlock centred on (cx, cy); w is the body width. */
+	static void drawPadlock(Graphics2D g, double cx, double cy, double w, Color c)
+	{
+		double bh = w * 0.72;
+		double by = cy - bh * 0.25;
+		double k = w * 0.3;
+		Path2D shackle = new Path2D.Double();
+		shackle.append(new Arc2D.Double(cx - k, by - k * 2, k * 2, k * 2.6, 0, 180, Arc2D.OPEN), false);
+		g.setStroke(new BasicStroke((float) Math.max(1.1, w * 0.17)));
+		g.setColor(Ink.DARK);
+		g.fill(new java.awt.geom.RoundRectangle2D.Double(cx - w / 2 - 0.8, by - 0.8, w + 1.6, bh + 1.6, 2, 2));
+		g.setColor(c);
+		g.draw(shackle);
+		g.fill(new java.awt.geom.RoundRectangle2D.Double(cx - w / 2, by, w, bh, 1.5, 1.5));
+		g.setColor(Ink.DARK);
+		g.fill(circle(cx, by + bh * 0.45, Math.max(0.6, w * 0.1)));
 	}
 
 	static void drawStar(Graphics2D g, double cx, double cy, double r, Color c)
