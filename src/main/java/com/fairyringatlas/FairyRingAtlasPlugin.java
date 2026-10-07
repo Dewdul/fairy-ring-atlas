@@ -633,7 +633,28 @@ public class FairyRingAtlasPlugin extends Plugin
 			applyLogFilter();
 			return;
 		}
-		travelLog.restore();
+		// a search that comes down to one ring selects it (a typed code), opening its map if it is
+		// elsewhere; any other new search replaces the old selection, so that selection's log
+		// filter does not hide what the search found
+		List<Ring> matches = repo.matching(q);
+		Ring only = null;
+		int dialable = 0;
+		for (Ring r : matches)
+		{
+			if (r.isDialable())
+			{
+				only = r;
+				dialable++;
+			}
+		}
+		if (dialable == 1)
+		{
+			select(only.getCode(), true);
+		}
+		else
+		{
+			clearSelection();
+		}
 		MapView v = view;
 		if (v == null)
 		{
@@ -641,7 +662,7 @@ public class FairyRingAtlasPlugin extends Plugin
 		}
 		List<Ring> onLayer = new ArrayList<>();
 		boolean elsewhere = false;
-		for (Ring r : repo.matching(q))
+		for (Ring r : matches)
 		{
 			if (v.getLayer().equals(r.getLayer()))
 			{
@@ -925,13 +946,13 @@ public class FairyRingAtlasPlugin extends Plugin
 	/**
 	 * Filter the travel log to the selection when allowed; otherwise leave it as the game drew it.
 	 * Not when the dials already show the code (the next step is Teleport), nor for a code the
-	 * player picked in the log itself.
+	 * player picked in the log itself. A selection wins over the log search: while the search has
+	 * text the game rebuilds the log every few frames, and each rebuild calls this again.
 	 */
 	private void applyLogFilter()
 	{
 		Ring r = repo.ring(selected);
-		// read the search live: the log rebuild can run before the varc change is announced
-		if (!config.filterTravelLog() || r == null || !currentSearch().isEmpty() || !repo.hasLogRow(r.getCode())
+		if (!config.filterTravelLog() || r == null || !repo.hasLogRow(r.getCode())
 			|| r.getCode().equals(logPicked) || Arrays.equals(DialMath.values(r.getCode()), dials())
 			|| !travelLog.apply(r, repo.favouriteSlot(r.getCode()), repo.getLogComponents(), config.selectedColor().getRGB() & 0xFFFFFF))
 		{
